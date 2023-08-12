@@ -26,4 +26,5 @@ Copy contents of `scribble.txt` into your mindstone and configure your weapons a
 I use VSCode with a [syntax highlighter](https://marketplace.visualstudio.com/items?itemName=Catalyst-42.c42-stonescript) for StoneScript
 
 ## Screenshot
+
 ![screenshot demonstrating custom UI](https://i.imgur.com/FbL3kJQ.jpg)

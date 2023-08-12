@@ -464,7 +464,8 @@ func can_slap()
   ^foe.distance <= 6 &
   ^foe ! immune_to_physical &
   ^buffs.string = max_pickpocket &
-  ^foe ! pallas & foe ! bolesh // immune
+  ^foe ! pallas & foe ! bolesh & foe 
+  ^! dysan // immune
 
 func should_slap()
   ?buffs.string ! max_pickpocket &
