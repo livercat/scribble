@@ -2,6 +2,7 @@
 
 Automation script for the Stone Story RPG.
 Equips weapons, uses abilities, deals with bosses!
+Also shows ability cooldowns and buff/debuff info.
 
 Pull requests and bug reports are very welcome.
 
@@ -23,3 +24,6 @@ Copy contents of `scribble.txt` into your mindstone and configure your weapons a
 ## Development
 
 I use VSCode with a [syntax highlighter](https://marketplace.visualstudio.com/items?itemName=Catalyst-42.c42-stonescript) for StoneScript
+
+## Screenshot
+![screenshot demonstrating custom UI](https://i.imgur.com/FbL3kJQ.jpg)
