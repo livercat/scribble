@@ -19,3 +19,7 @@ Copy contents of `scribble.txt` into your mindstone and configure your weapons a
 - Tested mostly on blue-level zones (6 to 10 stars) and a bit on white-levels (1-5)
 - Support only the following Lost Items (because I don't have the rest): `Skeleton Arm`, `Bashing Shield`, `Blade of the Fallen God`
 - Doesn't support staffs or warhammers
+
+## Development
+
+I use VSCode with a [syntax highlighter](https://marketplace.visualstudio.com/items?itemName=Catalyst-42.c42-stonescript) for StoneScript
