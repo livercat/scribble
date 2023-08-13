@@ -1,0 +1,10 @@
+Version 1.1
+- Major reorganization and clean up
+- Added more code comments
+- Added table of contents for easier navigation
+- Hide custom UI during cutscenes
+- Fixed incorrect pickpocketing on many bosses
+- Better handling of Poena
+
+Version 1.0
+- Initial release
