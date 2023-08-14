@@ -299,10 +299,10 @@ func melee(mode)
 func auto_ranged()
   ?use_abilities()
     return true
-  :?foe_dist > 20 & !phys_immune
+  :?foe_dist > 10 & !phys_immune
     return ranged("single")
-  :?low_hp
-    return ranged("def")
+  :?low_hp & foe_dist < 11
+    return melee("def")
   :?can_aoe
     return aoe("ranged")
   :
