@@ -89,7 +89,7 @@
 // shields
 var aether_shield = ""
 var fire_shield = ""
-var ice_shield = ""
+var ice_shield = "ice shield A"
 var poison_shield = "poison shield ap"
 var vigor_shield = "vigor shield ah"
 var dashing = "dashing shield"
@@ -368,14 +368,7 @@ func elemental(mode)
 // mode: "melee" | "ranged"
 func aoe(mode)
   ?mode = "ranged"
-    stance = "ranged aoe"
-    _found = get_1h_weapon("ranged")
-    ?!_found
-      dbg("can't find aoe wand for mode=" + 
-      ^mode)
-      _found = "wand"
-    return left_hand(_found) & 
-    ^offhand("dps", "ranged")
+    equip @ranged_2h@
   :?mode = "melee"
     ?best_wpns[t_best_2h_m]
       equip @best_wpns[t_best_2h_m]@
@@ -492,7 +485,7 @@ func shield_block(stay_still)
   stance = "shield block"
   ?stay_still
     equipL quest
-  shield()
+  equipR @vigor_shield@
 
 func must_ranged_foe()
   return foe = mosquito | 
