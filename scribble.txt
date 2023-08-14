@@ -124,20 +124,12 @@ var elemental_items = [
 ]
 // [aether, fire, ice, poison, vigor]
 var weapons = [
-  ["sword", [
-    ["aether", "D"],
+  ["sword", ["D"],
   ]],
   ["big sword", [
     ["fire", "D"],
     ["poison", "D"],
     ["vigor", "D"],
-  ]],
-  ["warhammer", [
-    ["aether", "D"],
-    ["fire", "dF"],
-    ["ice", "dI"],
-    ["poison", "dP"],
-    ["vigor", "dL"],
   ]],
   ["shield", [
     ["vigor", "ah"],
@@ -147,10 +139,20 @@ var weapons = [
     ["vigor", "ah"],
     ["poison", "ap"],
   ]],
+]
+var complex_weapons = [
   ["staff", [
     ["vigor", "ah"],
     ["poison", "ap"],
   ]],
+  ["warhammer", [
+    ["aether", "D"],
+    ["fire", "dF"],
+    ["ice", "dI"],
+    ["poison", "dP"],
+    ["vigor", "dL"],
+  ]],
+
 ]
 var warhammers = []
 var wands = []
@@ -173,7 +175,7 @@ func cache_items()
 // element: aether, fire, etc
 // for_debuff: bool (true/false)
 func get_item(type, element, for_debuff)
-
+  
 
 // Items with special abilities.
 // Supported: "dashing", "bardiche", 
