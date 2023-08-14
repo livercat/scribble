@@ -90,19 +90,19 @@
 var aether_shield = ""
 var fire_shield = ""
 var ice_shield = ""
-var poison_shield = "poison shield *8 ap"
-var vigor_shield = "vigor shield *9 ah"
-var dashing = "dashing shield *7"
+var poison_shield = "poison shield ap"
+var vigor_shield = "vigor shield ah"
+var dashing = "dashing shield"
 
 // one-handed melee
-var aether_1h = "aether sword *9 D"
-var fire_1h = "fire sword *8 dF"
-var ice_1h = "ice sword *8 dI"
-var poison_1h = "posion sword *8 dP"
-var vigor_1h = "vigor sword *9 dL"
+var aether_1h = "aether sword D"
+var fire_1h = "fire sword dF"
+var ice_1h = "ice sword dI"
+var poison_1h = "posion sword dP"
+var vigor_1h = "vigor sword dL"
 
 // anti-armor melee
-var aether_aa = "aether hammer *8 D"
+var aether_aa = "aether hammer D"
 var fire_aa = ""
 var ice_aa = ""
 var poison_aa = ""
@@ -110,18 +110,18 @@ var vigor_aa = ""
 
 // one-handed ranged
 var aether_wand = ""
-var fire_wand = "fire wand *8 D"
+var fire_wand = "fire wand D"
 var ice_wand = ""
-var poison_wand = "poison wand *9 D"
-var vigor_wand = "vigor wand *9 D"
+var poison_wand = "poison wand D"
+var vigor_wand = "vigor wand D"
 
 // 2-handed weapons
-var ranged_2h = "repeating crossbow *9"
-var melee_aoe = "heavy hammer *9"
+var ranged_2h = "repeating crossbow"
+var melee_aoe = "bardiche"
 
 // items with abilities
-var heavy_ham = "heavy hammer *9"
-var bard = "bardiche *9"
+var heavy_ham = "heavy hammer"
+var bard = "bardiche"
 // lost items
 var bashing = "bashing shield"
 var blade = "blade of the fallen god"
@@ -154,7 +154,7 @@ var smite_damage = 80
 var smite_treshold = 7
 
 // depends on spd of your ice sword dI
-var max_chill = 4
+var max_chill = 6
 
 // set to true if you're doing 
 // Skeletal Arm quests.
@@ -249,10 +249,10 @@ func healwalk()
 /********************
 **     #Combat    **
 ********************/
-
+// TODO: need to move wands out of ranged into aoe or elemental
 func fight()
   // chooses general approach to the combat
-  ?foe_dist < 5 & mindCD <= 0 & foe = explode
+  ?foe_dist < 7 & mindCD <= 0 & foe = explode
     return backflip()
   :?phys_immune | foe = magic_vulnerability
     return auto_elemental()
@@ -288,12 +288,12 @@ func melee(mode)
     dbg("unsupported mode for " +
     ^"melee(): " + mode)
     return false
-  var found = get_1h_weapon("melee")
-  ?!found
+  _found = get_1h_weapon("melee")
+  ?!_found
       dbg("can't find melee weapon for mode=" + 
       ^mode)
-    found = "sword"
-  return left_hand(found) & 
+    _found = "sword"
+  return left_hand(_found) & 
   ^offhand(mode, "melee")
 
 func auto_ranged()
@@ -318,12 +318,13 @@ func ranged(mode)
     dbg("unsupported mode for ranged(): " +
     ^mode)
     return false
-  ?mode = "single" & best_wpns[t_best_2h_r]
+  ?(foe = magic_resist | mode = "single") & 
+  ^best_wpns[t_best_2h_r]
     stance = "ranged single target"
     equip @best_wpns[t_best_2h_r]@
     return
-  var found = get_1h_weapon("ranged")
-  ?!found
+  _found = get_1h_weapon("ranged")
+  ?!_found
     ?mode = "dps" & best_wpns[t_best_2h_r]
       stance = "ranged single target"
       equip @best_wpns[t_best_2h_r]@
@@ -331,8 +332,8 @@ func ranged(mode)
     :
       dbg("can't find ranged wand for mode=" + 
       ^mode)
-      found = "wand"
-  return left_hand(found) & 
+      _found = "wand"
+  return left_hand(_found) & 
   ^offhand(mode, "ranged")
 
 func auto_elemental()
@@ -347,12 +348,12 @@ func auto_elemental()
 
 // mode: "dps" | "def"
 func elemental(mode)
-  var found = get_1h_weapon("ranged")
-  ?!found
+  _found = get_1h_weapon("ranged")
+  ?!_found
     dbg("can't find elemental wand for mode=" + 
     ^mode)
-    found = "wand"
-  left_hand(found)
+    _found = "wand"
+  left_hand(_found)
   ?mode = "def"
     stance = "elemental def"
     return offhand(mode, "shield")
@@ -368,12 +369,12 @@ func elemental(mode)
 func aoe(mode)
   ?mode = "ranged"
     stance = "ranged aoe"
-    var found = get_1h_weapon("ranged")
-    ?!found
+    _found = get_1h_weapon("ranged")
+    ?!_found
       dbg("can't find aoe wand for mode=" + 
       ^mode)
-      found = "wand"
-    return left_hand(found) & 
+      _found = "wand"
+    return left_hand(_found) & 
     ^offhand("dps", "ranged")
   :?mode = "melee"
     ?best_wpns[t_best_2h_m]
@@ -394,14 +395,14 @@ func left_hand(weapon)
 // mode: "dps" | "def"
 // type: "ranged" | "melee" | "shield"
 func offhand(mode, type)
-  ?type = "melee" & dash()
+  ?type ! "ranged" & dash()
     return true
   :?mode = "def"
     shield()
   :?mode = "dps"
-    var found = get_1h_weapon(type)
-    ?found
-      equipR @found@
+    _found = get_1h_weapon(type)
+    ?_found
+      equipR @_found@
     :
       dbg("can't find offhand for mode=" + 
       ^mode + ", type=" + type)
@@ -413,9 +414,9 @@ func offhand(mode, type)
   return true
 
 func shield()
-  var found = get_1h_weapon("shield")
-  ?found
-    equipR @found@
+  _found = get_1h_weapon("shield")
+  ?_found
+    equipR @_found@
   :
     dbg("can't find shield")
     equipR shield
@@ -494,14 +495,13 @@ func shield_block(stay_still)
   shield()
 
 func must_ranged_foe()
-  return foe.id = mosquito | 
-  ^foe.id = huge_mosquito | 
-  ^foe.id = fire_elemental
+  return foe = mosquito | 
+  ^foe = huge_mosquito | 
+  ^foe = fire_elemental | foe = ant
 
 func must_melee_foe()
-  return foe = immune_to_ranged | 
-  ^foe = ranged | foe = magic_resist |
-  ^foe.id = cult_guard // poisons on being hit
+  return foe = immune_to_ranged | foe = ranged | 
+  ^foe = cult_guard // poisons on being hit
 
 // mode: "dps" | "def" | "auto"
 func melee_boss(mode)
@@ -518,21 +518,22 @@ func melee_boss(mode)
 func debuff(mode)
   // note: don't bother debuffing
   // regular eneimes, it's faster to kill them
-  ?foe_buffs = no_debuff | foe_buffs = mirror
+  ?foe_buffs = disable_debuff | 
+  ^foe_buffs = mirror
     return false
-  var found
+  _found = false
   ?!(foe_debuffs = foe_poisoned) &
   ^!(foe = immune_to_debuff_damage)
-    found = poison_1h
+    _found = poison_1h
   :?!(foe_debuffs = foe_on_fire) &
   ^!(foe = immune_to_debuff_dot)
-    found = fire_1h
+    _found = fire_1h
   :?!(foe_debuffs = max_chill_s) &
   ^!(foe = immune_to_debuff_chill)
-    found = ice_1h
-  ?found
+    _found = ice_1h
+  ?_found
     stance = "debuffing"
-    left_hand(found)
+    left_hand(_found)
     ?mode = "def"
       offhand(mode, "shield")
     :?mode = "dps"
@@ -551,10 +552,10 @@ func aac(weapon)
   // the backswing animation,
   // effectively increasing your
   // attack speed
-  // ?weapon = heavy_ham
-  //   // clips itself too much
-  //   equip @weapon@
-  //   return
+  ?weapon = heavy_ham
+    // clips itself too much
+    equip @weapon@
+    return
   ?ai.idle & !berserk & !slowed
     equip wand
   equip @weapon@
@@ -578,7 +579,6 @@ func can_qs_dash()
 
 // quarterstaff
 func qs_dash()
-  // dbg("qs_dash()")
   equip quarterstaff
   ?item.CanActivate("quarterstaff")
     activate R
@@ -593,34 +593,28 @@ func can_backflip()
   
 // Mind Stone
 func backflip()
-  // dbg("backflip()")
   stance = "mind stone R"
   equipL mind
   shield()
 
 // skeleton arm
-func can_pickpocket()
-  return ability_wpns[arm_idx] & armCD <= 0 &
-  ^!disable_abilities & !disable_steal &
-  ^pp_amount >= max_pickpocket &
-  ^foe_dist <= 6 &
-  ^can_activate()
+func can_slap()
+  ?!ability_wpns[arm_idx] | foe_dist > 6 |
+  ^phys_immune | disable_abilities |
+  ^!can_activate()
+    return false
+  ?pp_amount < max_pickpocket & !slowed & !low_hp
+    return true // get to max buffs
+  return armCD > 0 & !disable_steal &
+  ^pp_amount >= max_pickpocket
 
 // skeleton arm
 func should_slap()
-  ?ability_wpns[arm_idx] & 
-  ^pp_amount < max_pickpocket &
-  ^foe_dist <= 6 & !low_hp & !slowed
-    return true // get to max buffs
-  :?can_pickpocket()
-    ?pickpocket_quest
-      return foe_ehp <= edmg(arm_damage)
-    return true
-  return false
+  return can_slap() & (!pickpocket_quest |
+  ^foe_ehp <= edmg(arm_damage))
 
 // skeleton arm
 func slap()
-  // dbg("slap()")
   stance = "skeleton arm R"
   aac(arm)
   ?pp_amount >= max_pickpocket &
@@ -642,7 +636,6 @@ func should_smite()
 
 // blade of the fallen god
 func smite()
-  // dbg("smite()")
   stance = "smite R"
   aac(blade)
   ?item.CanActivate("blade")
@@ -663,7 +656,6 @@ func should_hammer()
 
 // heavy hammer
 func hammer()
-  // dbg("hammer()")
   stance = "heavy hammer R"
   aac(heavy_ham)
   ?item.CanActivate("hammer")
@@ -672,10 +664,9 @@ func hammer()
 
 // bardiche
 func can_bard()
-  return ability_wpns[bard_idx] &
-  ^!disable_abilities &
+  return ability_wpns[bard_idx] & foe_dist <= 9 &
   ^(bardCD <= 0 | bardCD >= 870) &
-  ^!phys_immune & foe_dist <= 9 &
+  ^!disable_abilities & !phys_immune &
   ^can_activate()
 
 // bardiche
@@ -684,7 +675,6 @@ func should_bard()
 
 // bardiche
 func bardiche()
-  // dbg("bardiche()")
   stance = "bardiche R"
   aac(bard)
   ?item.CanActivate("bardiche")
@@ -705,8 +695,7 @@ func use_abilities()
   return false
 
 func can_activate()
-  return ai.enabled & ai.idle & 
-  ^item.CanActivate()
+  return ai.enabled & item.CanActivate()
 
 /*****************
 **    #Bosses   **
@@ -964,7 +953,7 @@ var max_chill_s = "❄:debuff_chill:" +
 ^max_chill + ":"
 var foe_poisoned = "∞:debuff_damage:1:"
 var foe_on_fire = "φ:debuff_dot:1:"
-var no_debuff = "buff_protection"
+var disable_debuff = "buff_protection"
 var mirror = "poena_mirror"
 var pickpocket_buff = "pick_pocket"
 
@@ -1017,6 +1006,7 @@ var maskCD = 0
 // spectacularly if you reuse the same global
 // var for multiple values in a single frame.
 var _used = false
+var _found = false
 // status handling
 var splt = [] // splitted buff/debuff string
 var st_uid = ""
