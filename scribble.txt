@@ -7,31 +7,6 @@
 /***************
 **  #Intro    **
 ***************/
-// Adjust weapons and runtime settings below
-// to suit your items and progress.
-// Almost all weapons are optional, but you do
-// need to set at least these:
-// `ranged_2h`, `best_1h`, `default_sh`.
-// `best_wand` is required for Boos in Halls
-
-// Supported weapon types:
-// - for abilities:
-//   heavy hammer, bardiche, dashing shield,
-//   quarterstaff, mindstone, bashing shield,
-//   skeleton arm, blade of the fallen god
-// - for ranged elemental and aoe:
-//   all wands
-// - for ranged single-target:
-//   repeating crossbow
-// - for 1h-melee:
-//   all 1h-swords, all warhammers, all shields
-// - for 2h-melee:
-//   any weapon, but without elemental switching
-// Unsupported:
-// - elemental staffs
-// - Equipping two 1-handed weapons of the 
-//   same element
-
 // Some variable names are shorter
 // than I would prefer for readability,
 // but Mindstone has line limit of 49 chars
@@ -85,101 +60,196 @@
 /***************
 **  #Weapons  **
 ***************/
+// Format:
+// ["weapon type",
+//   ["element", "suffix1", .., "suffixN"]
+// ]
+// Only list items that you actually want to use,
+// otherwise script can grab a random *0
+// you got from a chest
 
-// shields
-var aether_shield = ""
-var fire_shield = ""
-var ice_shield = ""
-var poison_shield = "poison shield ap"
-var vigor_shield = "vigor shield ah"
-var dashing = "dashing shield"
+// Full list of suffixes:
+// Defensive: staffs, warhammers, shields
+//   "au", "af", "ai", "ap", "ah", "A"
+// Offensive: staffs, warhammers, swords, xbows
+//   "dU", "dF", "dI", "dP", "dL", "D"
+// Exclusive to staffs and warhammers:
+//   "aU", "aF", "aI", "aP", "aL",
+//   "du", "df", "di", "dp", "dh"
 
-// one-handed melee
-var aether_1h = "aether sword D"
-var fire_1h = "fire sword dF"
-var ice_1h = "ice sword dI"
-var poison_1h = "posion sword dP"
-var vigor_1h = "vigor sword dL"
+// Each elemental weapon aside from staffs
+// and warhammers has two variants: "D" or "dX",
+// where "X" is the elemental modifier
+// ("A" and "ax" for shields).
+// Staffs and warhammers instead have six! 
+// "A", "D", "ax", "aX", "dx", "dX".
+// You can mutate between them using moondial.
 
-// anti-armor melee
-var aether_aa = "aether hammer D"
-var fire_aa = ""
-var ice_aa = ""
-var poison_aa = ""
-var vigor_aa = ""
+// Modifiers:
+// "A": get armor on egage for each foe
+// "D": attack bonus vs correct element
+// "x": on being hit, chance to: unmake (aether),
+//      fire dot, chill (ice), +attack (poison),
+//      heal (vigor)
+// "X": on attack, chance to: unmake (aether),
+//      fire dot, chill (ice), lifesteal (vigor),
+//      reduce foe attack (poison)
 
-// one-handed ranged
-var aether_wand = ""
-var fire_wand = "fire wand D"
-var ice_wand = ""
-var poison_wand = "poison wand D"
-var vigor_wand = "vigor wand D"
+// Also note that vigor's modifiers are different
+// between A and D variants:
+// "L" for offensive lifesteal and "h" for
+// defensive "heal on being hit",
+// so there are no "l" or "H" modifiers.
 
-// 2-handed weapons
-var ranged_2h = "repeating crossbow"
+var elemental_items = [
+  ["warhammer", [
+    ["aether", "D"],
+  ]],
+  ["wand", [
+    ["fire", "D"],
+    ["poison", "D"],
+    ["vigor", "D"],
+  ]],
+  ["sword", [
+    ["aether", "D"],
+    ["fire", "dF"],
+    ["ice", "dI"],
+    ["poison", "dP"],
+    ["vigor", "dL"],
+  ]],
+  ["shield", [
+    ["vigor", "ah"],
+    ["poison", "ap"],
+  ]],
+]
+// [aether, fire, ice, poison, vigor]
+var weapons = [
+  ["sword", [
+    ["aether", "D"],
+  ]],
+  ["big sword", [
+    ["fire", "D"],
+    ["poison", "D"],
+    ["vigor", "D"],
+  ]],
+  ["warhammer", [
+    ["aether", "D"],
+    ["fire", "dF"],
+    ["ice", "dI"],
+    ["poison", "dP"],
+    ["vigor", "dL"],
+  ]],
+  ["shield", [
+    ["vigor", "ah"],
+    ["poison", "ap"],
+  ]],
+  ["wand", [
+    ["vigor", "ah"],
+    ["poison", "ap"],
+  ]],
+  ["staff", [
+    ["vigor", "ah"],
+    ["poison", "ap"],
+  ]],
+]
+var warhammers = []
+var wands = []
+var swords = []
+var shields = []
+func cache_items()
+  var arr
+  for category : elemental_items
+    ?category = "warhammer"
+      arr = warhammers
+    :?category = "wand"
+      arr = wands
+    :?category = "sword"
+      arr = swords
+    :?category = "shield"
+      arr = shields
+    for element : category
+
+// type: wand, sword, etc
+// element: aether, fire, etc
+// for_debuff: bool (true/false)
+func get_item(type, element, for_debuff)
+
+
+// Items with special abilities.
+// Supported: "dashing", "bardiche", 
+// "heavy hammer"
+var special_items = [
+  "dashing", "bardiche", "heavy hammer",
+]
+// Lost Items
+// Supported: bashing, blade, arm
+var lost_items = [
+  "bashing", "blade", "arm",
+]
+
+// Weapon type to prefer for melee aoe
+// "staff", "bardiche", "heavy hammer" will 2h.
+// "wands", "big swords" will dual-wield 1h.
+// "" will disable melee aoe and will dual-wield
+// or 1h + shield
 var melee_aoe = "bardiche"
+// Weapon type to prefer for ranged aoe
+// "staff" will 2h, "wands" will dual-wield 1h.
+// "" will disable ranged aoe except
+// for phys-immune foes and will use repeating
+// xbow instead.
+var ranged_aoe = "wands"
 
-// items with abilities
-var heavy_ham = "heavy hammer"
-var bard = "bardiche"
-// lost items
-var bashing = "bashing shield"
-var blade = "blade of the fallen god"
-var arm = "skeleton arm"
-var mask = ""
-
-// your best weapons
-var best_1h = vigor_1h
-var best_1h_offhand = fire_1h
-var best_aa = aether_aa
-var best_aa_offhand = ""
-var best_wand = poison_wand
-var best_wand_offhand = fire_wand
-var best_shield = vigor_shield
+// Ranged single target
+var ranged_st = "repeating crossbow"
 
 /*********************
 **     #Settings    **
 *********************/
 
-// how many regular enemies are needed
+// Show ability cooldowns
+var ui_show_cd = true
+// Show your buffs/debuffs
+var ui_show_statuses = true
+// Show debug info (noisy, useful for research)
+var ui_show_debug = true
+
+// How many regular enemies are needed
 // to start using AOE weapons instead of
 // single target
 var aoe_treshold = 4
 
-// depends on * level of Blade of the Fallen God
-var smite_damage = 80
+// Low HP threshold in fraction of 1.
+// When on low HP, will prioritize vigor shield
+// and weapons over dps
+var low_hp_threshold = 0.5
 
-// at least this many enemies must be present
+// Find a suitable amount based on your dI weapon
+var max_chill = 6
+
+// Slower but safer, useful if you don't have 
+// good melee weapons, but have a repeating xbow
+var prefer_ranged = false
+
+// Set to true if you're doing Pallas quests
+// for the Blade.
+// Stages: "bolesh"
+var smite_quest = "bolesh"
+// Depends on level/enchants of the Blade
+var smite_damage = 85
+// At least this many enemies must be present
 // to trigger Smite
 var smite_treshold = 7
 
-// depends on spd of your ice sword dI
-var max_chill = 6
-
-// set to true if you're doing 
-// Skeletal Arm quests.
-// it will prioritize pickpocketing in combat,
-// and will try to only use it to finish off foes
+// set to true if you're doing Skeleton Arm
+// quests.
+// It will prioritize pickpocketing in combat,
+// and will try to only use it when non-boss foes
+// will die from the ability
 var pickpocket_quest = false
-
-// depends on * level of Skeleton Arm
+// These depend on level/enchants of the Arm
 var arm_damage = 32
-
-// depends on * level of Skeleton Arm
 var max_pickpocket = 2
-
-// slower but safer, especially if you don't
-// have good vigor shield and weapon
-var prefer_ranged = false
-
-// show ability cooldowns
-var ui_show_cd = true
-
-// show your buffs/debuffs
-var ui_show_statuses = true
-
-// show debug info (useful for research)
-var ui_show_debug = true
 
 /*********************
 **     #Progress    **
@@ -188,7 +258,7 @@ func progress()
   ?healwalk() // no enemies nearby
     return true
   :?foe = undamageable
-    shield_block(true)
+    return shield_block(true)
   :?!is_boss & !at_boss
     // regular enemies
     free_mind = true
