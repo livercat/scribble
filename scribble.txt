@@ -237,7 +237,7 @@ func healwalk()
       activate potion
     return false // start combat instead
   :?pickup.distance < 8
-    equipL ouroboros
+    equipL star
     equipR triskelion
   :?can_qs_dash()
     qs_dash()
@@ -293,9 +293,103 @@ func melee(mode)
       dbg("can't find melee weapon for mode=" + 
       ^mode)
     found = "sword"
-  equipL @found@
-  _used = found
-  return offhand(mode, "melee")
+  return left_hand(found) & 
+  ^offhand(mode, "melee")
+
+func auto_ranged()
+  ?use_abilities()
+    return true
+  :?foe_dist > 20 & !phys_immune
+    return ranged("single")
+  :?low_hp
+    return ranged("def")
+  :?can_aoe
+    return aoe("ranged")
+  :
+    return ranged("dps")
+
+// mode: "dps" | "def" | "single"
+func ranged(mode)
+  ?mode = "def"
+    stance = "ranged def"
+  :?mode = "dps"
+    stance = "ranged dps"
+  :?!(mode = "single")
+    dbg("unsupported mode for ranged(): " +
+    ^mode)
+    return false
+  ?mode = "single" & best_wpns[t_best_2h_r]
+    stance = "ranged single target"
+    equip @best_wpns[t_best_2h_r]@
+    return
+  var found = get_1h_weapon("ranged")
+  ?!found
+    ?mode = "dps" & best_wpns[t_best_2h_r]
+      stance = "ranged single target"
+      equip @best_wpns[t_best_2h_r]@
+      return
+    :
+      dbg("can't find ranged wand for mode=" + 
+      ^mode)
+      found = "wand"
+  return left_hand(found) & 
+  ^offhand(mode, "ranged")
+
+func auto_elemental()
+  ?use_abilities()
+    return true
+  :?foe_dist <= 11 & foe_ehp > 0 & can_backflip()
+    return backflip()
+  :?low_hp
+    return elemental("def")
+  :
+    return elemental("dps")
+
+// mode: "dps" | "def"
+func elemental(mode)
+  var found = get_1h_weapon("ranged")
+  ?!found
+    dbg("can't find elemental wand for mode=" + 
+    ^mode)
+    found = "wand"
+  left_hand(found)
+  ?mode = "def"
+    stance = "elemental def"
+    return offhand(mode, "shield")
+  :?mode = "dps"
+    stance = "elemental dps"
+    return offhand(mode, "ranged")
+  :
+    dbg("unsupported mode for elemental(): " +
+    ^mode)
+    return false
+
+// mode: "melee" | "ranged"
+func aoe(mode)
+  ?mode = "ranged"
+    stance = "ranged aoe"
+    var found = get_1h_weapon("ranged")
+    ?!found
+      dbg("can't find aoe wand for mode=" + 
+      ^mode)
+      found = "wand"
+    return left_hand(found) & 
+    ^offhand("dps", "ranged")
+  :?mode = "melee"
+    ?best_wpns[t_best_2h_m]
+      equip @best_wpns[t_best_2h_m]@
+      return true
+    :
+      return melee("def")
+  :
+    dbg("unsupported mode for aoe(): " +
+    ^mode)
+    return false
+
+func left_hand(weapon)
+  _used = weapon
+  equipL @weapon@
+  return true
 
 // mode: "dps" | "def"
 // type: "ranged" | "melee" | "shield"
@@ -306,8 +400,6 @@ func offhand(mode, type)
     shield()
   :?mode = "dps"
     var found = get_1h_weapon(type)
-    ?mode = "dps" & type = "ranged"
-      dbg("offhand ranged found: " + found)
     ?found
       equipR @found@
     :
@@ -342,97 +434,6 @@ func dash()
       equipR @dashing@
       return true
   return false
-
-func auto_ranged()
-  ?use_abilities()
-    return true
-  :?low_hp
-    return ranged("def")
-  :?can_aoe
-    return aoe("ranged")
-  :
-    return ranged("dps")
-
-// mode: "dps" | "def" | "single"
-func ranged(mode)
-  ?mode = "def"
-    stance = "ranged def"
-  :?mode = "dps"
-    stance = "ranged dps"
-  :?!(mode = "single")
-    dbg("unsupported mode for ranged(): " +
-    ^mode)
-    return false
-  ?mode = "single" & best_wpns[t_best_2h_r]
-    stance = "ranged single target"
-    equip best_wpns[t_best_2h_r]
-    return
-  var found = get_1h_weapon("ranged")
-  ?!found
-    ?mode = "dps" & best_wpns[t_best_2h_r]
-      stance = "ranged single target"
-      equip best_wpns[t_best_2h_r]
-      return
-    :
-      dbg("can't find ranged wand for mode=" + 
-      ^mode)
-      found = "wand"
-  equipL @found@
-  _used = found
-  return offhand(mode, "ranged")
-
-func auto_elemental()
-  ?use_abilities()
-    return true
-  :?foe_dist <= 11 & foe_ehp > 0 & can_backflip()
-    return backflip()
-  :?low_hp
-    return elemental("def")
-  :
-    return elemental("dps")
-
-// mode: "dps" | "def"
-func elemental(mode)
-  var found = get_1h_weapon("ranged")
-  ?!found
-    dbg("can't find elemental wand for mode=" + 
-    ^mode)
-    found = "wand"
-  equipL @found@
-  _used = found
-  ?mode = "def"
-    stance = "elemental def"
-    return offhand(mode, "shield")
-  :?mode = "dps"
-    stance = "elemental dps"
-    return offhand(mode, "ranged")
-  :
-    dbg("unsupported mode for elemental(): " +
-    ^mode)
-    return false
-
-// mode: "melee" | "ranged"
-func aoe(mode)
-  ?mode = "ranged"
-    stance = "ranged aoe"
-    var found = get_1h_weapon("ranged")
-    ?!found
-      dbg("can't find aoe wand for mode=" + 
-      ^mode)
-      found = "wand"
-    dbg("aoe ranged found: " + found)
-    _used = found
-    return offhand("dps", "ranged")
-  :?mode = "melee"
-    ?best_wpns[t_best_2h_m]
-      equip @best_wpns[t_best_2h_m]@
-      return true
-    :
-      return melee("def")
-  :
-    dbg("unsupported mode for aoe(): " +
-    ^mode)
-    return false
 
 // type: "ranged" | "melee" | "shield"
 func get_1h_weapon(type)
@@ -494,7 +495,8 @@ func shield_block(stay_still)
 
 func must_ranged_foe()
   return foe.id = mosquito | 
-  ^foe.id = huge_mosquito
+  ^foe.id = huge_mosquito | 
+  ^foe.id = fire_elemental
 
 func must_melee_foe()
   return foe = immune_to_ranged | 
@@ -530,16 +532,15 @@ func debuff(mode)
     found = ice_1h
   ?found
     stance = "debuffing"
+    left_hand(found)
     ?mode = "def"
-      _type = "shield"
+      offhand(mode, "shield")
     :?mode = "dps"
-      _type = "melee"
+      offhand(mode, "melee")
     :
       dbg("unsupported mode for " +
       ^"debuff(): " + mode)
-    equipL @found@
-    _used = found
-    return offhand(mode, _type)
+    return true
   :
     return false
 
@@ -550,10 +551,11 @@ func aac(weapon)
   // the backswing animation,
   // effectively increasing your
   // attack speed
-  ?weapon = heavy_ham
-    // clips itself too much
-    equip @weapon@
-  :?ai.idle & !berserk & !slowed
+  // ?weapon = heavy_ham
+  //   // clips itself too much
+  //   equip @weapon@
+  //   return
+  ?ai.idle & !berserk & !slowed
     equip wand
   equip @weapon@
   return true
@@ -608,7 +610,7 @@ func can_pickpocket()
 func should_slap()
   ?ability_wpns[arm_idx] & 
   ^pp_amount < max_pickpocket &
-  ^foe_dist <= 6 & !low_hp
+  ^foe_dist <= 6 & !low_hp & !slowed
     return true // get to max buffs
   :?can_pickpocket()
     ?pickpocket_quest
@@ -703,7 +705,8 @@ func use_abilities()
   return false
 
 func can_activate()
-  return ai.enabled & item.CanActivate()
+  return ai.enabled & ai.idle & 
+  ^item.CanActivate()
 
 /*****************
 **    #Bosses   **
@@ -715,7 +718,6 @@ func fight_dysan()
     ?foe.state = 33 & 
     ^foe.time > 23 & foe.time < 26
       // evade big attack
-      disable_abilities = true
       return melee("def")
     melee_boss("auto")
   :?foe = phase2
@@ -726,7 +728,6 @@ func fight_dysan()
     ?foe.state = 32 & foe.time > 90 |
     ^foe.state = 33 & foe.time < 2
       // prepare for attack
-      disable_abilities = true
       return melee("def")
     :?foe.state = 115
       ?foe.time = 60
@@ -757,13 +758,13 @@ func fight_xyloalgia()
     ?use_abilities()
       return
     ?vigor_wpns[t_1h]
-      equipL @vigor_wpns[t_1h]@
+      left_hand(vigor_wpns[t_1h])
       shield()
     :?aether_wpns[t_1h]
-      equipL @aether_wpns[t_1h]@
+      left_hand(aether_wpns[t_1h])
       shield()
     :?best_wpns[t_1h]
-      equipL @best_wpns[t_1h]@
+      left_hand(best_wpns[t_1h])
       shield()
     :
       melee("def")
@@ -807,7 +808,8 @@ func fight_bronze_guardian()
     backflip() // dodge the hammer
   :?foe.state = 33
     // hammer is down
-    melee("dps") // don't bother debuffing
+    ?!use_abilities()
+      melee("dps") // don't bother debuffing
   :?foe_dist > 15 & foe.state = 2
     ranged("single")
 
@@ -821,7 +823,8 @@ func fight_hrimnir()
       melee("dps") // don't debuff
   :?loc.stars <= 5 // try to cheese
     ?foe_dist <= 2
-      melee("dps") // don't debuff
+      ?!use_abilities()
+        melee("dps") // don't debuff
     :?foe_dist <= 5
       // The shovel has an attack range of 1
       // so at white stars we can avoid
@@ -1028,6 +1031,7 @@ var status_uids = []
 var arr_size = 0
 var idx = 0
 var errors = []
+var cache = []
 
 func _fill_status_uids()
   for st_info : statuses
@@ -1166,8 +1170,6 @@ func draw_ui()
       ^Mask @time.FormatDigital(maskCD)@
 
   ?ui_show_debug
-    >`1,19,#blue,L: @item.left@
-    >`1,20,#blue,R: @item.right@
     >`1,21,#blue,Stance: @stance@
     ?foe
       >`1,13,#7A8F93,+ @foe_buffs@
