@@ -103,6 +103,7 @@
 // priority: better ones first. Multiple copies
 // of the same suffix for the same item
 // will be ignored.
+
 var elemental_items = [
   ["warhammer", 
     ["aether", "D"],
@@ -125,31 +126,37 @@ var elemental_items = [
     ["ice", "A"],
   ],
 ]
+
 // Items with special abilities.
 // Supported: "dashing", "bardiche", 
 // "heavy hammer"
 var special_items = [
   "dashing", "bardiche", "heavy hammer",
 ]
+
 // Lost Items
-// Supported: bashing, blade, arm
+// Supported: bashing, blade, arm, mask
 var lost_items = [
-  "bashing", "blade", "arm",
+  "bashing", "blade", "arm", "mask"
 ]
+
 // full name of the shield with the highest
 // evade%
 var evade_shield = "vigor ah"
+
 // Weapon type to prefer for melee aoe:
 // "staff", "bardiche", "heavy hammer" will 2h.
 // "wands", "big swords" will dual-wield 1h.
 // "" will disable melee aoe and will dual-wield
 // or 1h + shield.
 var melee_aoe_weapon = "bardiche"
+
 // Weapon type to prefer for ranged aoe.
 // "staff" will 2h, "wands" will dual-wield 1h.
 // "" will disable ranged aoe and will 
 // move into melee range.
 var ranged_aoe_weapon = "wands"
+
 // Ranged single target weapon.
 // "repeating" will 2h.
 // "xbows", "wands" will dual-wield.
@@ -160,14 +167,18 @@ var ranged_st_weapon = "repeating"
 *********************/
 // Show ability cooldowns
 var ui_show_cd = true
+
 // Show your buffs/debuffs
 var ui_show_statuses = true
+
 // Show debug info (noisy, useful for research)
 var ui_show_debug = true
+
 // How many regular enemies are needed
 // to start using AOE weapons instead of
 // single target
 var aoe_treshold = 4
+
 // Low HP threshold, fraction of 1.
 // When on low HP, will prioritize ah shields
 // and dL weapon over matching element.
@@ -175,31 +186,57 @@ var aoe_treshold = 4
 // to get rid of zone cross).
 // If -1, will never lifesteal.
 var low_hp_threshold = 0.5
+
 // If true, then will prefer 1h+shield in melee
 // over dual-wield when on low HP.
 var use_shield_on_low_hp = true
+
 // Slower but safer, useful if you don't have 
 // good melee weapons, but have a repeating xbow
 var prefer_ranged = false
+
 // Find a suitable amount based on your dI weapon
 var max_chill = 6
+
 // Set to true if you're doing Pallas quests
 // for the Blade.
-// Stages: "bolesh"
-var smite_quest = "bolesh"
+// Stages: "bolesh", "variety"
+var bfg_quest = false
+
+// If you're on the "variety" step of the blade
+// quest, fill this array with names of the
+// enemies you've already defeated. You can take 
+// a screenshot of your R&D journal in game with
+// the defeated foes and then OCR it.
+// For example, on iOS you can just select and 
+// copy text in the default Photo app.
+var bfg_defeated_foes = ["example", "example 2"]
+
 // Depends on level/enchants of the Blade
 var smite_damage = 85
+
 // At least this many enemies must be present
 // to trigger Smite
 var smite_treshold = 7
+
 // Set to true if you're doing Skeleton Arm
 // quests. It will prioritize pickpocketing in 
 // combat, and will try to only use it when 
 // non-boss foes will die from the ability.
 var pickpocket_quest = false
+
 // These depend on level/enchants of the Arm
 var arm_damage = 32
 var max_pickpocket = 2
+
+// Use if you're doing Cultist Mask
+// quests.
+// Steps: "simple", "5debuffs".
+// "simple" is both for 1st and 3rd steps.
+// For the "5debuffs" step, you should stun
+// with grappling hook + mask without
+// automation.
+var mask_quest = "simple"
 
 /*********************
 **     #Progress    **
@@ -217,14 +254,13 @@ func progress()
   // Fight bosses
   stance = "boss combat"
   ?loc = rocky
-    ?loc.stars < 11
-      fight_dysan()
+    fight_dysan()
     // TODO handle courier boss
   :?loc = deadwood
     fight_xyloalgia()
+    // TODO epic_snail
   :?loc = caves
-    ?loc.stars < 11
-      fight_bolesh()
+    fight_bolesh()
     // TODO ceiling decorator
   :?loc = fungus_forest_boss
     fight_mushroom()
@@ -235,10 +271,9 @@ func progress()
   :?loc = icy_ridge
     fight_hrimnir()
   :?loc = nagaraja
-    fight_nagajara()
-  :
-    // unknown boss
-    auto_melee_boss("auto")
+    return fight_nagajara()
+  // unknown boss
+  auto_melee_boss()
 
 func idle()
   stance = "out of combat"
@@ -278,7 +313,7 @@ func fight()
   // chooses general approach to the combat
   ?foe_dist < 10 & mindCD <= 0 & foe = explode
     return backflip()
-  :?foe_dist < 15 & prefer_ranged & 
+  :?prefer_ranged & foe_dist < 10 & 
   ^can_backflip()
     return backflip()
   :?phys_immune
@@ -292,6 +327,11 @@ func fight()
     return auto_melee()
 
 func auto_melee()
+  ?mask_quest = "5debuffs"
+    equipR mask
+    ?can_mask()
+      return mask()
+    return debuff("def")
   ?use_abilities()
     return true
   :?melee_aoe_weapon & can_aoe & foe_dist < 8
@@ -422,7 +462,7 @@ func elemental_aoe()
 
 func can_dash()
   return !disable_dash & 
-  ^foe_dist >= 10 & foe_dist <= 16 &
+  ^foe_dist > 10 & foe_dist < 17 &
   ^(bashCD <= 0 | dashCD <= 0) &
   ^can_activate()
 
@@ -462,8 +502,6 @@ func auto_melee_boss()
 
 // mode: "dps" | "def"
 func debuff(mode)
-  // note: don't bother debuffing
-  // regular eneimes, it's faster to kill them
   ?foe_buffs = disable_debuff | 
   ^foe_buffs = mirror
     return false
@@ -486,11 +524,21 @@ func debuff(mode)
     ?found
       main_hand(found)
       i = 999
+  ?mask_quest = "5debuffs"
+    equipR mask
+    return
   found = false
   ?mode = "dps"
+    // try to get debuffing weapon
     for i = 0 .. consider.Count() - 1
       found = get_elem_equipment("melee", 
       ^consider[i], true)
+      ?found
+        equipR @found@
+        return true
+    // otherwise, a regular weapon
+    ?!found
+      found = get_equipment("melee", false)
       ?found
         equipR @found@
         return true
@@ -509,7 +557,7 @@ func aac(weapon)
   // attack speed
   ?weapon = "heavy hammer"
     // clips itself too much
-    equip "heavy hammer"
+    equip heavy hammer
     return
   ?ai.idle & !berserk & !slowed
     equip wand
@@ -535,7 +583,10 @@ func can_qs_dash()
 
 // quarterstaff
 func should_qs_dash()
-  return foe_dist > 16 & can_qs_dash()
+  return (prefer_ranged & foe_dist > 28 |
+  ^foe_dist > 16 |
+  ^is_boss & !(foe = immune_to_stun)) &
+  ^can_qs_dash()
 
 // quarterstaff
 func qs_dash()
@@ -566,14 +617,14 @@ func backflip()
 // skeleton arm
 func can_slap()
   ?!have_arm | foe_dist > 6 |
-  ^phys_immune | disable_abilities |
-  ^!can_activate()
+  ^phys_immune | disable_abilities
     return false
   ?pickpocket_stacks < max_pickpocket & 
   ^!slowed & !low_hp
     return true // get to max buffs
-  return armCD > 0 & !disable_steal &
-  ^pickpocket_stacks >= max_pickpocket
+  return have_arm & armCD <= 0 & !disable_steal &
+  ^pickpocket_stacks >= max_pickpocket &
+  ^can_activate()
 
 // skeleton arm
 func should_slap()
@@ -592,15 +643,22 @@ func slap()
 // blade of the fallen god
 func can_smite()
   return have_blade & smiteCD <= 0 &
-  ^!disable_abilities &
-  ^(foe ! pallas | foe = phase2 & 
-  ^foe_ehp < smite_treshold) &
+  ^!disable_smite & !disable_abilities &
+  ^foe_dist <= 20 & (foe ! pallas) & // immune
   ^can_activate()
 
 // blade of the fallen god
 func should_smite()
-  return (is_boss | foe.count >= smite_treshold &
-  ^foe_ehp<=edmg(smite_damage)) & can_smite()
+  ?bfg_quest = "variety"
+    ?foe_ehp<=edmg(smite_damage) & can_smite()
+      for e : bfg_defeated_foes
+        ?foe = e
+          return false
+      return true
+    return false
+  :
+    return (is_boss | foe.count >= smite_treshold
+    ^& foe_ehp<=edmg(smite_damage)) & can_smite()
 
 // blade of the fallen god
 func smite()
@@ -649,11 +707,31 @@ func bardiche()
     activate R
   return true
 
+// mask
+func can_mask()
+  return have_mask & !disable_abilities &
+  ^maskCD <= 0 & can_activate()
+
+// mask
+func should_mask()
+  return is_boss & can_mask()
+
+// mask
+func mask()
+  stance = "mask R"
+  equipR mask
+  ?item.CanActivate("mask")
+    activate R
+  return true
+
 func use_abilities()
   ?disable_abilities
     return false
-  ?pickpocket_quest & should_slap()
-    return slap() // prioritize skeleton quest
+  // prioritize quests
+  ?mask_quest = "simple" & can_mask()
+    return mask()
+  ?pickpocket_quest & can_slap()
+    return slap()
   ?should_hammer()
     return hammer()
   ?should_smite()
@@ -723,8 +801,15 @@ func fight_bolesh()
   ^(foe.time > 12 & foe.time < 18)
     // try to evade bites
     shield_block(true)
-  :?mindCD <= 0 ? foe_buffs ! "(bardCD <= 0 | bardCD >= 870) &
-  ^
+  :?bfg_quest = "bolesh" & 
+  ^(foe_ehp < edmg(smite_damage))
+    ?come_closer()
+      return true
+    :
+      equip @blade@
+  :?mindCD <= 0 &
+  ^foe_buffs ! "spider_buff_damage" & 
+  ^(use_abilities() | debuff("dps"))
     auto_melee_boss()
   :?mindCD <= 0 & foe_dist < 10
     backflip()
@@ -732,14 +817,41 @@ func fight_bolesh()
     ranged()
 
 func fight_mushroom()
-  ?loc.stars > 5 & foe = phase1
+  ?loc.stars > 5
     disable_steal = true
-  auto_melee_boss()
+  ?foe = phase1
+    ?foe.state = 32 & foe.time > 40
+      disable_abilities = true
+    ?foe.state = 32 & foe.time > 45 |
+    ^foe.state = 33 & foe.time < 1
+      // big swing
+      ?mindCD <= 0
+        return backflip()
+      :
+        return shield_block(false)
+    :?foe.state = 33 & 
+    ^foe.time > 3 & foe.time < 10
+      // pellets
+      return shield_block(false)
+    :
+      auto_melee_boss()
+  :?foe = mushroom_boss
+    ?foe.state = 32 & 
+    ^((foe.time > 28 & foe.time < 31) |
+    ^foe.time > 61) |
+    ^foe.state = 33 & foe.time < 1
+      // big swing
+      ?mindCD <= 0
+        return backflip()
+      :
+        return shield_block(false)
+  :
+    auto_melee_boss()
 
 func fight_pallas()
   at_boss = true
   disable_steal = true
-  ?foe.count > 4
+  ?foe.count > 2
     ?foe_dist < 15 & mindCD <= 0
       backflip()
     :
@@ -933,6 +1045,7 @@ var disable_abilities = false
 var disable_steal = false
 var disable_dash = false
 var disable_bash = false
+var disable_smite = false
 // foe status
 var foe_ehp = 0 // foe.armor + foe.hp
 var foe_dist = 0 // foe.distance
@@ -1047,16 +1160,16 @@ func prelude()
   phys_immune = (foe = immune_to_physical)
   can_aoe = (foe.count >= aoe_treshold) & !low_hp
 
-  ?foe = aether
+  ?loc = halls | foe = aether
     _elems = ["vigor", "fire", "ice", "poison"]
-  :?foe = fire
+  :?loc = mine | foe = fire
     _elems = ["aether", "ice", "poison", "vigor"]
-  :?foe = ice
+  :?loc = ridge | foe = ice
     _elems = ["fire", "aether", "poison", 
     "vigor"]
-  :?foe = poison
+  :?loc = caves | loc = temple | foe = poison
     _elems = ["ice", "aether", "fire", "vigor"]
-  :?foe = vigor
+  :?loc = mushroom | foe = vigor
     _elems = ["poison", "aether", "fire", "ice"]
   :
     _elems = ["vigor", "aether", "fire", 
@@ -1103,6 +1216,10 @@ func draw_ui()
       cd_ui_y++
       >`1,@cd_ui_y@,#@colorize(armCD, true)@,
       ^Arm @time.FormatDigital(armCD)@
+    ?have_mask
+      cd_ui_y++
+      >`1,@cd_ui_y@,#@colorize(maskCD, true)@,
+      ^Mask @time.FormatDigital(maskCD)@
 
   ?ui_show_debug
     cd_ui_y++
@@ -1155,27 +1272,20 @@ func reset_loop()
   cache.Clear()
   st_x.Clear()
 
-// var have_bard = 
-// ^special_items.IndexOf("bardiche") ! -1
-// var have_ham = 
-// ^special_items.IndexOf("heavy hammer") ! -1
-// var have_dashing = 
-// ^special_items.IndexOf("dashing") ! -1
-
-// var have_bashing = 
-// ^lost_items.IndexOf("bashing") ! -1
-// var have_arm = 
-// ^lost_items.IndexOf("arm") ! -1
-// var have_blade = 
-// ^lost_items.IndexOf("blade") ! -1
-
-var have_bard = true
-var have_ham = true
-var have_dashing = true
-
-var have_bashing = true
-var have_arm = true
-var have_blade = true
+var have_bard = 
+^special_items.IndexOf("bardiche") ! -1
+var have_ham = 
+^special_items.IndexOf("heavy hammer") ! -1
+var have_dashing = 
+^special_items.IndexOf("dashing") ! -1
+var have_bashing = 
+^lost_items.IndexOf("bashing") ! -1
+var have_arm = 
+^lost_items.IndexOf("arm") ! -1
+var have_blade = 
+^lost_items.IndexOf("blade") ! -1
+var have_mask = 
+^lost_items.IndexOf("mask") ! -1
 
 var type_offsets = [
   "sword", "big sword", "wand",
@@ -1317,7 +1427,7 @@ func main_hand(it)
 **   #Runtime  **
 ****************/
 ?loc.begin
-  ?loc = caves
+  ?loc = caves | loc = halls
     prefer_ranged = true
   _fill_status_uids()
   _fill_items_cache()
