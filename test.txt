@@ -1,0 +1,136 @@
+var elemental_items = [
+  ["warhammer", 
+    ["aether", "D"],
+  ],
+  ["wand", 
+    ["fire", "D"],
+    ["poison", "D"],
+    ["vigor", "D"],
+  ],
+  ["sword", 
+    ["aether", "D"],
+    ["fire", "dF", "D + 1", "D"],
+    ["ice", "dI"],
+    ["poison", "dP"],
+    ["vigor", "dL"],
+  ],
+  ["shield", 
+    ["vigor", "ah"],
+    ["poison", "ap"],
+  ],
+]
+
+var type_offsets = [
+  "sword", "big sword", "wand",
+  "shield", "crossbow", "staff", 
+  "warhammer"
+  ]
+var elem_offsets = [
+  "aether", "fire", "ice", "poison", "vigor"
+  ]
+var equipment = [
+  // Each element of this array is
+  // [[damage/armor items], [debuff items]]
+  // they're placed by equip offset, then by
+  // elem offset.
+  // For example: first element is aether swords, 
+  // seconds is fire swords, sixth is aether 
+  // big swords.
+  // See also: get_item()
+]
+// template: "<element> <type> <suffix>"
+var name_template = "{0} {1} {2}"
+func fill_items_cache()
+  // add placeholders for every type+element pair
+  for i = 0 .. (type_offsets.Count() * 
+    ^elem_offsets.Count())
+    equipment.Add([[], []])
+   // `it` is 
+   // ["type": ["elem", "s1", "sn"], [elem2...]]
+  for it : elemental_items
+    ?it.Count() > 1
+      for i = 1 .. it.Count() - 1
+        //`el_it` is ["elem", "s1", "sn"]
+        var el_it = it[i]
+        ?el_it.Count() > 1
+          var elem = el_it[0]
+          var t = it[0]
+          var to = type_offsets.IndexOf(t)
+          var eo = elem_offsets.IndexOf(elem)
+          // for every suffix in list
+          for i = 1 .. el_it.Count() - 1
+            var suffix = el_it[i]
+            // `slot` is 
+            // [[dmg items], [debuff items]]
+            var slot = equipment[to * 5 + eo]
+            var full_name = string.Format(
+              ^name_template, elem, t, suffix)
+            ?is_debuff(suffix) & 
+              ^slot[1].IndexOf(full_name) = -1
+              slot[1].Add(full_name)
+            :?slot[0].IndexOf(full_name) = -1
+              slot[0].Add(full_name)
+  
+// t: wand, sword, etc
+// element: aether, fire, etc
+// debuff: bool (true/false)
+func get_item(t, element, debuff)
+  var to = type_offsets.IndexOf(t)
+  var eo = elem_offsets.IndexOf(element)
+  var slot = equipment[to * 5 + eo]
+  var found = false
+  ?debuff
+    found = find(slot[1], _main_hand)
+  :
+    found = find(slot[0], _main_hand)
+    ?!found
+      found = find(slot[1], _main_hand)
+  return found
+
+func find(arr, exclude)
+  dbg1("find(" + string.Join(",", arr) + ", " +
+  ^exclude + ")")
+  ?arr.Count() > 0
+    for it : arr
+      ?!exclude | !string.Equals(exclude, it)
+        return it
+  return false
+
+var _main_hand = false
+func main_hand(it)
+  equipL @it@
+  _main_hand = it
+
+var debuff_suffixes = "fFiIpP"
+func is_debuff(suffix)
+  ?string.Size(suffix) < 2
+    return false
+  // check second letter of the suffix
+  return string.IndexOf(debuff_suffixes,
+  ^string.Sub(suffix, 1, 1)) ! -1
+
+var msgs = []
+func dbg1(e)
+  ?msgs.IndexOf(e) = -1
+    msgs.Add(e)
+
+func show_ui()
+  var y_offset = 2
+  for msg : msgs
+    >`10,@y_offset@,@msg@
+    y_offset++
+
+func test()
+  var L = get_item("sword", "ice", false)
+  dbg1(L)
+  main_hand(L)
+  var R = get_item("sword", "poison", true)
+  dbg1(R)
+  equipR @R@
+
+fill_items_cache()
+test()
+show_ui()
+loc.Pause()
+
+

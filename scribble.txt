@@ -52,7 +52,6 @@
 //   #Bosses - specific boss mechanics
 //   #Internals - var declarations and boring
 //                internal functions
-//   #WeaponCache - we don't talk about that :<
 //   #Runtime - actual place where the script is 
 //              executed
 
@@ -60,13 +59,23 @@
 /***************
 **  #Weapons  **
 ***************/
-// Format:
-// ["weapon type",
-//   ["element", "suffix1", .., "suffixN"]
-// ]
-// Only list items that you actually want to use,
-// otherwise script can grab a random *0
-// you got from a chest
+// Each elemental weapon aside from staffs
+// and warhammers has two variants: "D" or "dX",
+// where "X" is the elemental modifier
+// ("A" and "ax" for shields).
+// Staffs and warhammers instead have six! 
+// "A", "D", "ax", "aX", "dx", "dX".
+// You can mutate between them using moondial.
+
+// Meaning of letters in suffix:
+// "A": get armor on egage for each foe
+// "D": attack bonus vs correct element
+// "x": on being hit, chance to: unmake (aether),
+//      fire dot, chill (ice), +attack (poison),
+//      heal (vigor)
+// "X": on attack, chance to: unmake (aether),
+//      fire dot, chill (ice), lifesteal (vigor),
+//      reduce foe attack (poison)
 
 // Full list of suffixes:
 // Defensive: staffs, warhammers, shields
@@ -77,106 +86,44 @@
 //   "aU", "aF", "aI", "aP", "aL",
 //   "du", "df", "di", "dp", "dh"
 
-// Each elemental weapon aside from staffs
-// and warhammers has two variants: "D" or "dX",
-// where "X" is the elemental modifier
-// ("A" and "ax" for shields).
-// Staffs and warhammers instead have six! 
-// "A", "D", "ax", "aX", "dx", "dX".
-// You can mutate between them using moondial.
-
-// Modifiers:
-// "A": get armor on egage for each foe
-// "D": attack bonus vs correct element
-// "x": on being hit, chance to: unmake (aether),
-//      fire dot, chill (ice), +attack (poison),
-//      heal (vigor)
-// "X": on attack, chance to: unmake (aether),
-//      fire dot, chill (ice), lifesteal (vigor),
-//      reduce foe attack (poison)
-
-// Also note that vigor's modifiers are different
-// between A and D variants:
+// Note that vigor has 2 different letters:
 // "L" for offensive lifesteal and "h" for
-// defensive "heal on being hit",
-// so there are no "l" or "H" modifiers.
+// defensive "heal on being hit".
+// There are no "l" or "H" modifiers.
 
+// Fill `elemental_items` with your items.
+// Format:
+// ["weapon type", 
+//   ["element1", "suffix1", .., "suffixN"],
+//   ["element2", "suffix1", .., "suffixN"],
+// ]
+// Only list items that you actually want to use,
+// otherwise script can grab a random *0 that
+// you got from a chest. Also list suffixes by
+// priority: better ones first. Multiple copies
+// of the same suffix for the same item
+// will be ignored.
 var elemental_items = [
-  ["warhammer", [
+  ["warhammer", 
     ["aether", "D"],
-  ]],
-  ["wand", [
+  ],
+  ["wand", 
     ["fire", "D"],
     ["poison", "D"],
     ["vigor", "D"],
-  ]],
-  ["sword", [
+  ],
+  ["sword", 
     ["aether", "D"],
-    ["fire", "dF"],
+    ["fire", "dF", "D"],
     ["ice", "dI"],
     ["poison", "dP"],
     ["vigor", "dL"],
-  ]],
-  ["shield", [
+  ],
+  ["shield", 
     ["vigor", "ah"],
     ["poison", "ap"],
-  ]],
+  ],
 ]
-// [aether, fire, ice, poison, vigor]
-var weapons = [
-  ["sword", ["D"],
-  ]],
-  ["big sword", [
-    ["fire", "D"],
-    ["poison", "D"],
-    ["vigor", "D"],
-  ]],
-  ["shield", [
-    ["vigor", "ah"],
-    ["poison", "ap"],
-  ]],
-  ["wand", [
-    ["vigor", "ah"],
-    ["poison", "ap"],
-  ]],
-]
-var complex_weapons = [
-  ["staff", [
-    ["vigor", "ah"],
-    ["poison", "ap"],
-  ]],
-  ["warhammer", [
-    ["aether", "D"],
-    ["fire", "dF"],
-    ["ice", "dI"],
-    ["poison", "dP"],
-    ["vigor", "dL"],
-  ]],
-
-]
-var warhammers = []
-var wands = []
-var swords = []
-var shields = []
-func cache_items()
-  var arr
-  for category : elemental_items
-    ?category = "warhammer"
-      arr = warhammers
-    :?category = "wand"
-      arr = wands
-    :?category = "sword"
-      arr = swords
-    :?category = "shield"
-      arr = shields
-    for element : category
-
-// type: wand, sword, etc
-// element: aether, fire, etc
-// for_debuff: bool (true/false)
-func get_item(type, element, for_debuff)
-  
-
 // Items with special abilities.
 // Supported: "dashing", "bardiche", 
 // "heavy hammer"
@@ -188,7 +135,6 @@ var special_items = [
 var lost_items = [
   "bashing", "blade", "arm",
 ]
-
 // Weapon type to prefer for melee aoe
 // "staff", "bardiche", "heavy hammer" will 2h.
 // "wands", "big swords" will dual-wield 1h.
@@ -201,7 +147,6 @@ var melee_aoe = "bardiche"
 // for phys-immune foes and will use repeating
 // xbow instead.
 var ranged_aoe = "wands"
-
 // Ranged single target
 var ranged_st = "repeating crossbow"
 
@@ -215,24 +160,19 @@ var ui_show_cd = true
 var ui_show_statuses = true
 // Show debug info (noisy, useful for research)
 var ui_show_debug = true
-
 // How many regular enemies are needed
 // to start using AOE weapons instead of
 // single target
 var aoe_treshold = 4
-
 // Low HP threshold in fraction of 1.
 // When on low HP, will prioritize vigor shield
 // and weapons over dps
 var low_hp_threshold = 0.5
-
 // Find a suitable amount based on your dI weapon
 var max_chill = 6
-
 // Slower but safer, useful if you don't have 
 // good melee weapons, but have a repeating xbow
 var prefer_ranged = false
-
 // Set to true if you're doing Pallas quests
 // for the Blade.
 // Stages: "bolesh"
@@ -242,12 +182,10 @@ var smite_damage = 85
 // At least this many enemies must be present
 // to trigger Smite
 var smite_treshold = 7
-
-// set to true if you're doing Skeleton Arm
-// quests.
-// It will prioritize pickpocketing in combat,
-// and will try to only use it when non-boss foes
-// will die from the ability
+// Set to true if you're doing Skeleton Arm
+// quests. It will prioritize pickpocketing in 
+// combat, and will try to only use it when 
+// non-boss foes will die from the ability.
 var pickpocket_quest = false
 // These depend on level/enchants of the Arm
 var arm_damage = 32
@@ -266,14 +204,18 @@ func progress()
     free_mind = true
     return fight()
 
-  // only bosses below
+  // Fight bosses
   stance = "boss combat"
-  ?loc = rocky // TODO handle courier boss
-    fight_dysan()
+  ?loc = rocky
+    ?loc.stars < 11
+      fight_dysan()
+    // TODO handle courier boss
   :?loc = deadwood
     fight_xyloalgia()
   :?loc = caves
-    fight_bolesh() // TODO ceiling decorator
+    ?loc.stars < 11
+      fight_bolesh()
+    // TODO ceiling decorator
   :?loc = fungus_forest_boss
     fight_mushroom()
   :?loc = undead_crypt_boss
@@ -286,7 +228,7 @@ func progress()
     fight_nagajara()
   :
     // unknown boss
-    melee_boss("auto")
+    auto_melee_boss("auto")
 
 func idle()
   stance = "out of combat"
@@ -321,21 +263,18 @@ func healwalk()
 /********************
 **     #Combat    **
 ********************/
-// TODO: need to move wands out of ranged into aoe or elemental
 func fight()
   // chooses general approach to the combat
-  ?foe_dist < 7 & mindCD <= 0 & foe = explode
+  ?foe_dist < 10 & mindCD <= 0 & foe = explode
     return backflip()
   :?phys_immune | foe = magic_vulnerability
     return auto_elemental()
-  :?foe_dist < 8 & pickpocket_quest 
-  ^& should_slap()
+  :?pickpocket_quest & foe_dist < 8 &
+  ^should_slap()
     return slap() // prioritize skeleton quest
   :?must_melee_foe()
     return auto_melee()
   :?prefer_ranged | must_ranged_foe()
-    return auto_ranged()
-  :?foe_dist > 16 | (foe_dist > 10 & can_aoe)
     return auto_ranged()
   :
     return auto_melee()
@@ -352,6 +291,8 @@ func auto_melee()
 
 // mode: "dps" | "def"
 func melee(mode)
+  ?foe_dist > 16 & can_qs_dash()
+    return qs_dash()
   ?mode = "def"
     stance = "melee def"
   :?mode = "dps"
@@ -360,7 +301,7 @@ func melee(mode)
     dbg("unsupported mode for " +
     ^"melee(): " + mode)
     return false
-  _found = get_1h_weapon("melee")
+  _found = get_item("melee")
   ?!_found
       dbg("can't find melee weapon for mode=" + 
       ^mode)
@@ -576,7 +517,7 @@ func must_melee_foe()
   ^foe = cult_guard // poisons on being hit
 
 // mode: "dps" | "def" | "auto"
-func melee_boss(mode)
+func auto_melee_boss(mode)
   ?mode = "auto"
     ?low_hp
       mode = "def"
@@ -647,10 +588,12 @@ func aac(weapon)
 
 // quarterstaff
 func can_qs_dash()
-  return staffCD <= 0 & can_activate()
+  return !dash_disabled & staffCD <= 0 & 
+  ^can_activate()
 
 // quarterstaff
 func qs_dash()
+  stance = "staff-dashing"
   equip quarterstaff
   ?item.CanActivate("quarterstaff")
     activate R
@@ -780,11 +723,11 @@ func fight_dysan()
     ^foe.time > 23 & foe.time < 26
       // evade big attack
       return melee("def")
-    melee_boss("auto")
+    auto_melee_boss("auto")
   :?foe = phase2
     // just match elements
     disable_steal = true
-    melee_boss("auto")
+    auto_melee_boss("auto")
   :?foe = phase3
     ?foe.state = 32 & foe.time > 90 |
     ^foe.state = 33 & foe.time < 2
@@ -803,12 +746,12 @@ func fight_dysan()
       disable_abilities = true
     :?foe.state = 107 | foe.state = 32
       disable_steal = true
-    melee_boss("dps")
+    auto_melee_boss("dps")
 
 func fight_xyloalgia()
   ?foe = phase1
     // Xyloalgia
-    return melee_boss("auto")
+    return auto_melee_boss("auto")
   // Poena
   disable_steal = true
   ?foe.state = 32 & foe.time > 40
@@ -830,7 +773,7 @@ func fight_xyloalgia()
     :
       melee("def")
   :
-    melee_boss("auto")
+    auto_melee_boss("auto")
 
 func fight_bolesh()
   ?loc.stars > 5
@@ -841,7 +784,7 @@ func fight_bolesh()
     shield_block(true)
   :?(bardCD <= 0 | bardCD >= 870) &
   ^mindCD <= 0
-    melee_boss("auto")
+    auto_melee_boss("auto")
   :?mindCD <= 0 & foe_dist < 10
     backflip()
   :
@@ -850,7 +793,7 @@ func fight_bolesh()
 func fight_mushroom()
   ?loc.stars > 5 & foe = phase1
     disable_steal = true
-  melee_boss("auto")
+  auto_melee_boss("auto")
 
 func fight_pallas()
   at_boss = true
@@ -861,7 +804,7 @@ func fight_pallas()
     :
       elemental("dps")
   :
-    melee_boss("auto")
+    auto_melee_boss("auto")
 
 func fight_bronze_guardian()
   disable_steal = true
@@ -920,7 +863,7 @@ func fight_hrimnir()
     // don't waste time on movement
     ranged("single")
   :
-    melee_boss("auto")
+    auto_melee_boss("auto")
 
 func fight_nagajara()
   disable_steal = true
@@ -944,7 +887,7 @@ func fight_nagajara()
     ranged("single")
   :?naga_step = 3
     // dash into melee
-    melee_boss("dps")
+    auto_melee_boss("dps")
   :?naga_step >= 4
     ?mindCD <= 0
       // dodge back and repeat
@@ -952,7 +895,7 @@ func fight_nagajara()
       naga_step = 0
     :
       // mind stone on CD, try to def
-      melee_boss("def")
+      auto_melee_boss("def")
 
 func is_poison_near(pos_x, pos_y)
   // long and mid range
@@ -1195,11 +1138,6 @@ func prelude()
   bardCD = item.GetCooldown("bardiche")
   maskCD = item.GetCooldown("mask")
 
-func dbg(e)
-  ?ui_show_debug
-    ?errors.IndexOf(e) = -1
-      errors.Add(e)
-
 func draw_ui()
   ?ui_show_statuses
     >`1,22,#00A300,+ @string.Join(", ", st_good)@
@@ -1260,229 +1198,132 @@ func reset_loop()
   cache.Clear()
   st_x.Clear()
 
-/********************
-**   #WeaponCache  **
-********************/
 
-// I want to support cases where you don't
-// have particular weapons, and do it efficiently
-// and ergonomically.
-// Unfortunately, StoneScript is quite limited,
-// and without hashmaps and ternary operators
-// we have a lot of boilerplate :(
-// warning: scary stuff below
 
-// cache weapon info, it never changes mid-zone.
-// to do this, we package caching logic into
-// functions and call them once, on `loc.begin`
+var type_offsets = [
+  "sword", "big sword", "wand",
+  "shield", "crossbow", "staff", 
+  "warhammer"
+  ]
+var elem_offsets = [
+  "aether", "fire", "ice", "poison", "vigor"
+  ]
+var equipment = [
+  // Each element of this array is
+  // [[damage/armor items], [debuff items]]
+  // they're placed by equip offset, then by
+  // elem offset.
+  // For example: first element is aether swords, 
+  // seconds is fire swords, sixth is aether 
+  // big swords.
+  // See also: get_item()
+]
+// template: "<element> <type> <suffix>"
+var name_template = "{0} {1} {2}"
+func _fill_items_cache()
+  // add placeholders for every type+element pair
+  for i = 0 .. (type_offsets.Count() * 
+    ^elem_offsets.Count())
+    equipment.Add([[], []])
+   // `it` is 
+   // ["type": ["elem", "s1", "sn"], [elem2...]]
+  for it : elemental_items
+    ?it.Count() > 1
+      for i = 1 .. it.Count() - 1
+        //`el_it` is ["elem", "s1", "sn"]
+        var el_it = it[i]
+        ?el_it.Count() < 2
+          i++ // continue
+        var ty = it[0] // item type
+        var elem = el_it[0] // item element
+        var offset = type_offsets.IndexOf(ty) *
+        ^ 5 + elem_offsets.IndexOf(elem)
+        // for every suffix in list
+        for j = 1 .. el_it.Count() - 1
+          var suffix = el_it[j]
+          // `slot` is 
+          // [[dmg items], [debuff items]]
+          var slot = equipment[offset]
+          var full_name = string.Format(
+            ^name_template, elem, ty, suffix)
+          ?is_debuff(suffix) & 
+            ^slot[1].IndexOf(full_name) = -1
+            slot[1].Add(full_name)
+          :?slot[0].IndexOf(full_name) = -1
+            slot[0].Add(full_name)
 
-// arrays with weapons, arranged in
-// particular order (see various `idx`).
-// this looks very gnarly, but with these arrays
-// we can easily check the weapon existence and
-// equip it (or use an ability):
-// ?aether_wpns[t_1h]
-//   equipL @aether_wpns[t_1h]@
+var melee_1h_items = [
+  "sword", "big sword", "warhammer"]
+func get_1h_item(range, element, debuff)
 
-// items with active abilities
-var ability_wpns = []
-var ham_idx = 0
-var bard_idx = 1
-var dash_idx = 2
-var bash_idx = 3
-var arm_idx = 4
-var blade_idx = 5
-func _cache_ability_weapons()
-  ?some(heavy_ham)
-    ability_wpns.Add(heavy_ham)
-  :
-    ability_wpns.Add(false)
-  ?some(bard)
-    ability_wpns.Add(bard)
-  :
-    ability_wpns.Add(false)
-  ?some(dashing)
-    ability_wpns.Add(dashing)
-  :
-    ability_wpns.Add(false)
-  ?some(bashing)
-    ability_wpns.Add(bashing)
-  :
-    ability_wpns.Add(false)
-  ?some(arm)
-    ability_wpns.Add(arm)
-  :
-    ability_wpns.Add(false)
-  ?some(blade)
-    ability_wpns.Add(blade)
-  :
-    ability_wpns.Add(false)
-  ?some(mask)
-    ability_wpns.Add(mask)
-  :
-    ability_wpns.Add(false)
-// best weapons and shields.
-// indexes 0-3 match elemental weapon
-// indexes to simplify weapon selection:
-// offhand for the type is type + 4
-var best_wpns = []
-var t_best_1h_off = 4
-var t_best_aa_off = 5
-var t_best_wand_off = 6
-var t_best_2h_m = 7 // melee 2-hander
-var t_best_2h_r = 8 // ranged 2-hander
-func _cache_best_weapons()
-  ?some(best_1h)
-    best_wpns.Add(best_1h)
-  :
-    best_wpns.Add(false)
-  ?some(best_aa)
-    best_wpns.Add(best_aa)
-  :
-    best_wpns.Add(false)
-  ?some(best_wand)
-    best_wpns.Add(best_wand)
-  :
-    best_wpns.Add(false)
-  ?some(best_shield)
-    best_wpns.Add(best_shield)
-  :
-    best_wpns.Add(false)
-  ?some(best_1h_offhand)
-    best_wpns.Add(best_1h_offhand)
-  :
-    best_wpns.Add(false)
-  ?some(best_aa_offhand)
-    best_wpns.Add(best_aa_offhand)
-  :
-    best_wpns.Add(false)
-  ?some(best_wand_offhand)
-    best_wpns.Add(best_wand_offhand)
-  :
-    best_wpns.Add(false)
-  ?some(melee_aoe)
-    best_wpns.Add(melee_aoe)
-  :
-    best_wpns.Add(false)
-  ?some(ranged_2h)
-    best_wpns.Add(ranged_2h)
-  :
-    best_wpns.Add(false)
-// elemental weapons and shields
-var aether_wpns = []
-var fire_wpns = []
-var ice_wpns = []
-var poison_wpns = []
-var vigor_wpns = []
-var t_1h = 0 // 1-hander
-var t_aa = 1 // anti-armor
-var t_wand = 2
-var t_shield = 3
-func _cache_aether_weapons()
-  ?some(aether_1h)
-    aether_wpns.Add(aether_1h)
-  :
-    aether_wpns.Add(false)
-  ?some(aether_aa)
-    aether_wpns.Add(aether_aa)
-  :
-    aether_wpns.Add(false)
-  ?some(aether_wand)
-    aether_wpns.Add(aether_wand)
-  :
-    aether_wpns.Add(false)
-  ?some(aether_shield)
-    aether_wpns.Add(aether_shield)
-  :
-    aether_wpns.Add(false)
-func _cache_fire_weapons()
-  ?some(fire_1h)
-    fire_wpns.Add(fire_1h)
-  :
-    fire_wpns.Add(false)
-  ?some(fire_aa)
-    fire_wpns.Add(fire_aa)
-  :
-    fire_wpns.Add(false)
-  ?some(fire_wand)
-    fire_wpns.Add(fire_wand)
-  :
-    fire_wpns.Add(false)
-  ?some(fire_shield)
-    fire_wpns.Add(fire_shield)
-  :
-    fire_wpns.Add(false)
-func _cache_ice_weapons()
-  ?some(ice_1h)
-    ice_wpns.Add(ice_1h)
-  :
-    ice_wpns.Add(false)
-  ?some(ice_aa)
-    ice_wpns.Add(ice_aa)
-  :
-    ice_wpns.Add(false)
-  ?some(ice_wand)
-    ice_wpns.Add(ice_wand)
-  :
-    ice_wpns.Add(false)
-  ?some(ice_shield)
-    ice_wpns.Add(ice_shield)
-  :
-    ice_wpns.Add(false)
-func _cache_poison_weapons()
-  ?some(poison_1h)
-    poison_wpns.Add(poison_1h)
-  :
-    poison_wpns.Add(false)
-  ?some(poison_aa)
-    poison_wpns.Add(poison_aa)
-  :
-    poison_wpns.Add(false)
-  ?some(poison_wand)
-    poison_wpns.Add(poison_wand)
-  :
-    poison_wpns.Add(false)
-  ?some(poison_shield)
-    poison_wpns.Add(poison_shield)
-  :
-    poison_wpns.Add(false)
-func _cache_vigor_weapons()
-  ?some(vigor_1h)
-    vigor_wpns.Add(vigor_1h)
-  :
-    vigor_wpns.Add(false)
-  ?some(vigor_aa)
-    vigor_wpns.Add(vigor_aa)
-  :
-    vigor_wpns.Add(false)
-  ?some(vigor_wand)
-    vigor_wpns.Add(vigor_wand)
-  :
-    vigor_wpns.Add(false)
-  ?some(vigor_shield)
-    vigor_wpns.Add(vigor_shield)
-  :
-    vigor_wpns.Add(false)
+  
+// ty: wand, sword, etc
+// element: aether, fire, etc
+// debuff: bool (true/false)
+func get_item(ty, element, debuff)
+  var offset = type_offsets.IndexOf(t) * 5 + 
+  ^elem_offsets.IndexOf(elem)
+  var slot = equipment[offset]
+  var found = false
+  ?!debuff
+    found = _find(slot[0], _main_hand)
+    // if not found D item, try to find dX item
+  ?debuff | !found
+    found = _find(slot[1], _main_hand)
+  return found
+
+func _find(arr, exclude)
+  ?arr.Count() > 0
+    for it : arr
+      ?!exclude | !string.Equals(exclude, it)
+        return it
+  return false
+
+var _main_hand = false
+func main_hand(it)
+  equipL @it@
+  _main_hand = it
+
+var debuff_suffixes = "fFiIpP"
+func is_debuff(suffix)
+  ?string.Size(suffix) < 2
+    return false
+  // check second letter of the suffix
+  return string.IndexOf(debuff_suffixes,
+  ^string.Sub(suffix, 1, 1)) ! -1
+
+func test()
+  var L = get_item("sword", "ice", false)
+  dbg1(L)
+  main_hand(L)
+  var R = get_item("sword", "poison", true)
+  dbg1(R)
+  equipR @R@
+
+_fill_items_cache()
+test()
+show_ui()
+loc.Pause()
 
 /****************
 **   #Runtime  **
 ****************/
-?loc.begin
-  _cache_ability_weapons()
-  _cache_best_weapons()
-  _cache_aether_weapons()
-  _cache_fire_weapons()
-  _cache_ice_weapons()
-  _cache_poison_weapons()
-  _cache_vigor_weapons()
-  _fill_status_uids()
-  ?item.potion = empty
-    brew_pot()
-:?loc.loop
-  reset_loop()
-:?ai.enabled & !ai.paused
-  prelude()
-  progress()
-  draw_ui()
-:
-  idle()
+// ?loc.begin
+//   _cache_ability_weapons()
+//   _cache_best_weapons()
+//   _cache_aether_weapons()
+//   _cache_fire_weapons()
+//   _cache_ice_weapons()
+//   _cache_poison_weapons()
+//   _cache_vigor_weapons()
+//   _fill_status_uids()
+//   ?item.potion = empty
+//     brew_pot()
+// :?loc.loop
+//   reset_loop()
+// :?ai.enabled & !ai.paused
+//   prelude()
+//   progress()
+//   draw_ui()
+// :
+//   idle()
