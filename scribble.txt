@@ -223,7 +223,7 @@ func idle()
     equipR triskelion
   :?hp < maxhp
     equipL ouroboros
-    equipR triskelion
+    shield()
   :
     equipL triskelion
     shield()
@@ -280,6 +280,8 @@ func auto_melee()
 
 // mode: "dps" | "def"
 func melee(mode)
+  ?foe_dist > 16 & can_qs_dash()
+    return qs_dash()
   ?mode = "def"
     stance = "melee def"
   :?mode = "dps"
@@ -498,6 +500,8 @@ func must_melee_foe()
 
 // mode: "dps" | "def" | "auto"
 func melee_boss(mode)
+  ?foe_dist > 16 & can_qs_dash()
+    return qs_dash()
   ?mode = "auto"
     ?low_hp
       mode = "def"
@@ -760,7 +764,8 @@ func fight_bolesh()
   ^(foe.time > 12 & foe.time < 18)
     // try to evade bites
     shield_block(true)
-  :?(bardCD <= 0 | bardCD >= 870) &
+  // :?(bardCD <= 0 | bardCD >= 870) &
+  :?(foe_buffs ! "spider_buff_damage") &
   ^mindCD <= 0
     melee_boss("auto")
   :?mindCD <= 0 & foe_dist < 10
