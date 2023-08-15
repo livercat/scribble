@@ -122,6 +122,7 @@ var elemental_items = [
   ["shield", 
     ["vigor", "ah"],
     ["poison", "ap"],
+    ["ice", "A"],
   ],
 ]
 // Items with special abilities.
@@ -135,6 +136,9 @@ var special_items = [
 var lost_items = [
   "bashing", "blade", "arm",
 ]
+// full name of the shield with the highest
+// evade%
+var evade_shield = "vigor ah"
 // Weapon type to prefer for melee aoe:
 // "staff", "bardiche", "heavy hammer" will 2h.
 // "wands", "big swords" will dual-wield 1h.
@@ -171,6 +175,8 @@ var aoe_treshold = 4
 // to get rid of zone cross).
 // If -1, will never lifesteal.
 var low_hp_threshold = 0.5
+// If true, then will prefer 1h+shield in melee
+// over dual-wield when on low HP.
 var use_shield_on_low_hp = true
 // Slower but safer, useful if you don't have 
 // good melee weapons, but have a repeating xbow
@@ -240,7 +246,7 @@ func idle()
     equipL star
     equipR triskelion
   :?can_qs_dash()
-    qs_dash()
+    return qs_dash()
   :?hp < maxhp
     equipL ouroboros
     equipR triskelion
@@ -297,8 +303,10 @@ func auto_melee()
 
 // mode: "dps" | "def" | "aoe"
 func melee(mode)
-  ?should_qs_dash()
-    return qs_dash()
+  ?come_closer()
+    return true
+  ?foe_dist > 7
+    mode = "def"
   var offhand
   ?mode = "dps"
     stance = "melee dps"
@@ -323,14 +331,19 @@ func melee(mode)
     main_hand(found)
   :
     dbg("melee(" + mode + "): no weapon found")
-  ?can_dash()
-    return dash()
   found = maybe_healing_equipment(offhand)
   ?found
     equipR @found@
   :
     dbg("melee(" + mode + "): no " + 
     ^ offhand + " found")  
+
+func come_closer()
+  ?should_qs_dash()
+    return qs_dash()
+  :?can_dash()
+    return dash()
+  return false  
 
 func auto_ranged()
   ?use_abilities()
@@ -408,7 +421,7 @@ func elemental_aoe()
     ^"): no offhand found")
 
 func can_dash()
-  return ?!disable_dash & 
+  return !disable_dash & 
   ^foe_dist >= 10 & foe_dist <= 16 &
   ^(bashCD <= 0 | dashCD <= 0) &
   ^can_activate()
@@ -418,16 +431,13 @@ func dash()
     equipR bashing
   :?dashCD <= 0 & have_dashing
     equipR dashing
+  return true
 
 func shield_block(stay_still)
   stance = "shield block"
   ?stay_still
     equipL quest
-  found = maybe_healing_equipment("shield")
-  ?found
-    equipR @found@
-  :
-    dbg("shield_block(): no shield found")
+  equipR @evade_shield@
 
 func must_ranged_foe()
   return foe = mosquito | 
@@ -439,6 +449,8 @@ func must_melee_foe()
   ^foe = cult_guard // poisons on being hit
 
 func auto_melee_boss()
+  ?come_closer()
+    return true
   var mode
   ?low_hp
     mode = "def"
@@ -518,7 +530,7 @@ func aac(weapon)
 
 // quarterstaff
 func can_qs_dash()
-  return !dash_disabled & staffCD <= 0 & 
+  return !disable_dash & staffCD <= 0 & 
   ^can_activate()
 
 // quarterstaff
@@ -531,6 +543,7 @@ func qs_dash()
   equip quarterstaff
   ?item.CanActivate("quarterstaff")
     activate R
+  return true
 
 // Mind Stone
 func can_backflip()
@@ -544,7 +557,11 @@ func can_backflip()
 func backflip()
   stance = "mind stone R"
   equipL mind
-  shield()
+  found = get_equipment("shield", false)
+  ?found
+    equipR @found@
+  :
+    dbg("backflip(): no shield found")
 
 // skeleton arm
 func can_slap()
@@ -706,8 +723,8 @@ func fight_bolesh()
   ^(foe.time > 12 & foe.time < 18)
     // try to evade bites
     shield_block(true)
-  :?(bardCD <= 0 | bardCD >= 870) &
-  ^mindCD <= 0
+  :?mindCD <= 0 ? foe_buffs ! "(bardCD <= 0 | bardCD >= 870) &
+  ^
     auto_melee_boss()
   :?mindCD <= 0 & foe_dist < 10
     backflip()
@@ -987,9 +1004,6 @@ func parse_statuses()
           pickpocket_stacks = st_amount
 
         var idx = status_uids.IndexOf(st_uid)
-        dbg("??? " + 
-        ^string.Equals(st_uid, pickpocket_buff) + 
-        ^", " + status_uids.IndexOf(st_uid))
         ?idx ! -1
           var st_info = statuses[idx]
           var st_dur = int.Parse(splt[i+2])
@@ -1071,26 +1085,46 @@ func draw_ui()
 
   ?ui_show_cd
     var cd_ui_y = 6
-    >`1,@cd_ui_y@,#@colorize(mindCD)@,Mind 
-    ^@time.FormatDigital(mindCD)@
+    >`1,@cd_ui_y@,#@colorize(mindCD, true)@,
+    ^Mind @time.FormatDigital(mindCD)@
     ?have_ham
       cd_ui_y++
-      >`1,@cd_ui_y@,#@colorize(hammerCD)@,
+      >`1,@cd_ui_y@,#@colorize(hammerCD, true)@,
       ^Hammer @time.FormatDigital(hammerCD)@
     ?have_bard
       cd_ui_y++
-      >`1,@cd_ui_y@,#@colorize(bardCD)@,
+      >`1,@cd_ui_y@,#@colorize(bardCD, true)@,
       ^Bard @time.FormatDigital(bardCD)@
     ?have_blade
       cd_ui_y++
-      >`1,@cd_ui_y@,#@colorize(smiteCD)@,
+      >`1,@cd_ui_y@,#@colorize(smiteCD, true)@,
       ^Blade @time.FormatDigital(smiteCD)@
     ?have_arm
       cd_ui_y++
-      >`1,@cd_ui_y@,#@colorize(armCD)@,
+      >`1,@cd_ui_y@,#@colorize(armCD, true)@,
       ^Arm @time.FormatDigital(armCD)@
 
   ?ui_show_debug
+    cd_ui_y++
+    var cd_ui_x = 1
+    >`@cd_ui_x@,@cd_ui_y@,#@colorize(staffCD, 
+    ^can_qs_dash())@,QS
+    cd_ui_x = cd_ui_x + 2
+    ?have_bashing
+      >`@cd_ui_x@,@cd_ui_y@,#7A8F93,/
+      cd_ui_x++
+      >`@cd_ui_x@,@cd_ui_y@,#@colorize(bashCD,
+      ^(!disable_bash & can_dash()))@,B
+      cd_ui_x++
+    ?have_dashing
+      >`@cd_ui_x@,@cd_ui_y@,#7A8F93,/
+      cd_ui_x++
+      >`@cd_ui_x@,@cd_ui_y@,#@colorize(dashCD,
+      ^can_dash())@,D
+    
+    >`1,20,#blue,Low HP: @low_hp@
+    ?low_hp
+      >`9,20,#red,@low_hp@
     >`1,21,#blue,Stance: @stance@
     ?foe
       >`1,13,#7A8F93,+ @foe_buffs@
@@ -1105,10 +1139,12 @@ func draw_ui()
       >`15,@ey@,#red,@err@
       ey++
 
-func colorize(cd)
-  ?cd > 0 | disable_abilities
+func colorize(cd, allowed)
+  ?cd > 0
     return "red"
-  return "green" // ready
+  ?!allowed
+    return "FE6800"
+  return "green"
 
 func brew_pot()
   brew tar + bronze // vampiric
@@ -1281,6 +1317,9 @@ func main_hand(it)
 **   #Runtime  **
 ****************/
 ?loc.begin
+  ?loc = caves
+    prefer_ranged = true
+  _fill_status_uids()
   _fill_items_cache()
   ?item.potion = empty
     brew_pot()
