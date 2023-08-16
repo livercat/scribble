@@ -1,6 +1,6 @@
 // "scribble"
 // StoneScript automation for Stone Story RPG
-// Ver. 1.1
+// Ver. 1.2
 // Project: https://github.com/livercat/scribble
 // by livercat
 
@@ -35,7 +35,7 @@
 //   and boss handling
 // fight() - main logic for choosing range and
 //   type of weapons/abilities
-// melee(), ranged(), aoe(), elem() - equip
+// melee(), ranged(), elemental() - equip
 //   appropriate weapons
 
 //  *** Table of Contents ***
@@ -246,6 +246,8 @@ func progress()
     return true
   :?foe = undamageable
     return shield_block(true)
+  :?foe_dist < 5 & mindCD <= 0 & foe = explode
+    return backflip()
   :?!is_boss & !at_boss
     // regular enemies
     free_mind = true
@@ -254,42 +256,48 @@ func progress()
   // Fight bosses
   stance = "boss combat"
   ?loc = rocky
-    fight_dysan()
+    return fight_dysan()
     // TODO handle courier boss
   :?loc = deadwood
-    fight_xyloalgia()
+    return fight_xyloalgia()
     // TODO epic_snail
   :?loc = caves
-    fight_bolesh()
+    return fight_bolesh()
     // TODO ceiling decorator
   :?loc = fungus_forest_boss
-    fight_mushroom()
+    return fight_mushroom()
   :?loc = undead_crypt_boss
-    fight_pallas()
+    return fight_pallas()
   :?loc = bronze_guardian
-    fight_bronze_guardian()
+    return fight_bronze_guardian()
   :?loc = icy_ridge
-    fight_hrimnir()
+    return fight_hrimnir()
   :?loc = nagaraja
     return fight_nagajara()
-  // unknown boss
-  auto_melee_boss()
+  
+  // minibosses
+  ?foe.id = "epic_snail" | foe.id = "fluff"
+    auto_melee()
+  :
+    // unknown boss
+    dbg("Fighting unknown boss, foe.id="+foe.id)
+    auto_melee_boss()
 
 func idle()
   stance = "out of combat"
   ?pickup.distance < 8
     equipL star
     equipR triskelion
+    return
   :?can_qs_dash()
     return qs_dash()
   :?hp < maxhp
     equipL ouroboros
-    equipR triskelion
   :
     equipL triskelion
-    found = get_equipment("shield", false)
-    ?found
-      equipR @found@
+  found = get_equipment("shield", false)
+  ?found
+    equipR @found@
 
 func healwalk()
   ?foe & foe_dist < 23
@@ -311,9 +319,7 @@ func healwalk()
 ********************/
 func fight()
   // chooses general approach to the combat
-  ?foe_dist < 10 & mindCD <= 0 & foe = explode
-    return backflip()
-  :?prefer_ranged & foe_dist < 10 & 
+  ?prefer_ranged & foe_dist < 10 & 
   ^can_backflip()
     return backflip()
   :?phys_immune
@@ -820,33 +826,26 @@ func fight_mushroom()
   ?loc.stars > 5
     disable_steal = true
   ?foe = phase1
-    ?foe.state = 32 & foe.time > 40
-      disable_abilities = true
-    ?foe.state = 32 & foe.time > 45 |
-    ^foe.state = 33 & foe.time < 1
+    ?foe.state = 32 & foe.time > 46
       // big swing
       ?mindCD <= 0
         return backflip()
       :
         return shield_block(false)
     :?foe.state = 33 & 
-    ^foe.time > 3 & foe.time < 10
+    ^foe.time > 5 & foe.time < 8
       // pellets
       return shield_block(false)
-    :
-      auto_melee_boss()
   :?foe = mushroom_boss
     ?foe.state = 32 & 
     ^((foe.time > 28 & foe.time < 31) |
-    ^foe.time > 61) |
-    ^foe.state = 33 & foe.time < 1
+    ^foe.time > 61)
       // big swing
       ?mindCD <= 0
         return backflip()
       :
         return shield_block(false)
-  :
-    auto_melee_boss()
+  auto_melee_boss()
 
 func fight_pallas()
   at_boss = true
@@ -958,7 +957,9 @@ func is_poison_near(pos_x, pos_y)
     return true
   return false
 
-func _detect_poison(pos_x, pos_y)
+func _detect_poison()
+  var x = screen.FromWorldX(pos.x)
+  var y = screen.FromWorldZ(pos.z)
   >`0,0,x=@x@, y=@y@
   for px = pos_x .. pos_x+10
     for py = pos_y-6 .. pos_y
@@ -997,10 +998,12 @@ var statuses = [
   ["pick_pocket", "Pickpocket", "+"],
   ["vampiric", "Vamp", "+"],
   ["lucky_crit_multi", "Lucky", "+"],
+  ["invisibility", "Invis", "+"],
   ["debuff_damage", "DmgDown", "-"],
   ["debuff_duration_damage", "DmgDown", "-"],
   ["spider_debuff_damage", "DmgDown", "-"],
   ["dysangelos_debuff_damage", "DmgDown", "-"],
+  ["puff_debuff_damage", "DmgDown", "-"],
   ["debuff_yeti_chill", "AtkSlow", "-"],
   ["debuff_attack_speed", "AtkSlow", "-"],
   ["debuff_move_speed", "MoveSlow", "-"],
@@ -1011,7 +1014,7 @@ var statuses = [
 ]
 var dmg_debuffs = [
   "debuff_damage", "debuff_duration_damage",
-  "spider_debuff_damage",
+  "spider_debuff_damage", "puff_debuff_damage"
 ]
 var slow_debuffs = [
   "debuff_chill", "debuff_move_speed"
