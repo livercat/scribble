@@ -115,12 +115,11 @@ var elemental_items = [
   ["warhammer", 
     ["aether", "D"],
     ["fire", "dF", "D"],
-    ["default", "stone warhammer + 1"],
   ],
   ["wand", 
     ["fire", "D"],
     ["poison", "D"],
-    ["vigor", "D"],
+    ["vigor", "dL"],
   ],
   ["sword", 
     ["aether", "D"],
@@ -128,13 +127,13 @@ var elemental_items = [
     ["ice", "dI"],
     ["poison", "dP"],
     ["vigor", "dL"],
-    ["default", "sword + 1", "big sword + 2"],
+    ["default", "vigor sword dL"],
   ],
   ["shield", 
     ["vigor", "ah"],
     ["poison", "ap"],
     ["ice", "A"],
-    ["default", "composite"],
+    ["default", "vigor shield ah"],
   ],
 ]
 
@@ -256,12 +255,12 @@ var max_pickpocket = 2
 
 // Use if you're doing Cultist Mask
 // quests.
-// Steps: "simple", "5debuffs".
-// "simple" is both for 1st and 3rd steps.
-// For the "5debuffs" step, you should stun
-// with grappling hook + mask without
-// automation.
-var mask_quest = "simple"
+// "simple" - steps 1 and 3 (uses on CD)
+// "5debuffs" - step 2 (debuffs after mask). You
+//    will have to stun yourself with grappling
+// "prevent" - step 5. Uses on CD only on bosses.
+// false - disable automatic mask usage
+var mask_quest = "prevent"
 
 /*********************
 **     #Progress    **
@@ -270,8 +269,8 @@ func progress()
   ?healwalk() // no enemies nearby
     return true
   :?foe = undamageable
-    return shield_block(true)
-  :?foe_dist < 5 & mindCD <= 0 & foe = explode
+    return shield_block_and_halt()
+  :?range < 5 & mindCD <= 0 & foe = explode
     return backflip()
   :?!is_boss & !at_boss
     // regular enemies
@@ -325,7 +324,7 @@ func idle()
     equipR @found@
 
 func healwalk()
-  ?foe & foe_dist < 23
+  ?foe & range < 23
     ?hp < (maxhp / 4) & item.potion ! empty &
     ^(item.potion = "healing" | 
     ^item.potion = "vampiric")
@@ -344,7 +343,7 @@ func healwalk()
 ********************/
 func fight()
   // chooses general approach to the combat
-  ?prefer_ranged & foe_dist < 10 & 
+  ?prefer_ranged & range < 10 & 
   ^can_backflip()
     return backflip()
   :?phys_immune
@@ -365,7 +364,7 @@ func auto_melee()
     return debuff("def")
   ?use_abilities()
     return true
-  :?melee_aoe_weapon & can_aoe & foe_dist < 8
+  :?melee_aoe_weapon & can_aoe & range < 8
     return melee("aoe")
   :?low_hp & use_shield_on_low_hp
     return melee("def")
@@ -376,7 +375,7 @@ func auto_melee()
 func melee(mode)
   ?come_closer()
     return true
-  ?foe_dist > 7
+  ?range > 7
     mode = "def"
   var offhand
   ?mode = "dps"
@@ -419,7 +418,7 @@ func come_closer()
 func auto_ranged()
   ?use_abilities()
     return true
-  :?ranged_aoe_weapon & can_aoe & foe_dist <= 16
+  :?ranged_aoe_weapon & can_aoe & range <= 16
     return elemental_aoe()
   :?ranged_st_weapon
     return ranged()
@@ -493,7 +492,7 @@ func elemental_aoe()
 
 func can_dash()
   return !disable_dash & 
-  ^foe_dist > 10 & foe_dist < 17 &
+  ^range > 10 & range < 17 &
   ^(bashCD <= 0 | dashCD <= 0) &
   ^can_activate()
 
@@ -503,12 +502,6 @@ func dash()
   :?dashCD <= 0 & have_dashing
     equipR dashing
   return true
-
-func shield_block(stay_still)
-  stance = "shield block"
-  ?stay_still
-    equipL quest
-  equipR @evade_shield@
 
 func must_ranged_foe()
   return foe = mosquito | 
@@ -609,13 +602,13 @@ func aac(weapon)
 
 // quarterstaff
 func can_qs_dash()
-  return !disable_dash & staffCD <= 0 & 
-  ^can_activate()
+  return !ability_lock & !disable_dash & 
+  ^staffCD <= 0 & can_activate()
 
 // quarterstaff
 func should_qs_dash()
-  return (prefer_ranged & foe_dist > 28 |
-  ^foe_dist > 16 |
+  return (prefer_ranged & range > 28 |
+  ^range > 16 |
   ^is_boss & !(foe = immune_to_stun)) &
   ^can_qs_dash()
 
@@ -631,7 +624,8 @@ func qs_dash()
 func can_backflip()
   // don't check this condition
   // for boss mechanics (when free_mind is false)
-  return free_mind & mindCD <= 0 &
+  return !ability_lock & free_mind & 
+  ^mindCD <= 0 &
    // don't jump into the wall
   ^screen.FromWorldX(pos.x) > 5
   
@@ -647,8 +641,8 @@ func backflip()
 
 // skeleton arm
 func can_slap()
-  ?!have_arm | foe_dist > 6 |
-  ^phys_immune | disable_abilities
+  ?ability_lock | !have_arm | range > 6 |
+  ^phys_immune
     return false
   ?pickpocket_stacks < max_pickpocket & 
   ^!slowed & !low_hp
@@ -673,9 +667,10 @@ func slap()
 
 // blade of the fallen god
 func can_smite()
-  return have_blade & smiteCD <= 0 &
-  ^!disable_smite & !disable_abilities &
-  ^foe_dist <= 20 & (foe ! pallas) & // immune
+  return !ability_lock & 
+  ^have_blade & smiteCD <= 0 &
+  ^!disable_smite & 
+  ^range <= 20 & (foe ! pallas) & // immune
   ^can_activate()
 
 // blade of the fallen god
@@ -701,8 +696,8 @@ func smite()
 
 // heavy hammer
 func can_hammer()
-  return have_ham & !phys_immune & 
-  ^!disable_abilities & foe_dist <= 7 &
+  return !ability_lock & have_ham & 
+  ^!phys_immune & range <= 7 &
   ^(hammerCD <= 0 | hammerCD >= 647) &
   ^can_activate()
 
@@ -713,6 +708,7 @@ func should_hammer()
 
 // heavy hammer
 func hammer()
+  ability_lock = "hammer"
   stance = "heavy hammer R"
   aac("heavy hammer")
   ?item.CanActivate("hammer")
@@ -721,9 +717,9 @@ func hammer()
 
 // bardiche
 func can_bard()
-  return have_bard & foe_dist <= 9 &
+  return !ability_lock & have_bard & 
+  ^range <= 9 & !phys_immune
   ^(bardCD <= 0 | bardCD >= 870) &
-  ^!disable_abilities & !phys_immune &
   ^can_activate()
 
 // bardiche
@@ -732,6 +728,7 @@ func should_bard()
 
 // bardiche
 func bardiche()
+  ability_lock = "bardiche"
   stance = "bardiche R"
   aac("bardiche")
   ?item.CanActivate("bardiche")
@@ -740,7 +737,7 @@ func bardiche()
 
 // mask
 func can_mask()
-  return have_mask & !disable_abilities &
+  return !ability_lock & have_mask & 
   ^maskCD <= 0 & can_activate()
 
 // mask
@@ -756,13 +753,14 @@ func mask()
   return true
 
 func use_abilities()
-  ?disable_abilities
-    return false
   // prioritize quests
   ?mask_quest = "simple" & can_mask()
     return mask()
+  ?mask_quest = "prevent" & should_mask()
+    return mask()
   ?pickpocket_quest & can_slap()
     return slap()
+  // then use where needed
   ?should_hammer()
     return hammer()
   ?should_smite()
@@ -780,23 +778,37 @@ func can_activate()
 **    #Bosses   **
 *****************/
 
+func lock_abilities(source)
+  // doesn't interrupt the ability that's
+  // already in progres, but prevents
+  // new ones from starting
+  ?!ability_lock
+    ability_lock = source
+
+func shield_block()
+  stance = "shield block"
+  equipR @evade_shield@
+
+func shield_block_and_halt()
+  stance = "shield block and halt"
+  equipL quest
+  equipR @evade_shield@
+
 func fight_dysan()
   ?foe = phase1
     disable_steal = true
-    ?foe.state = 33 & 
-    ^foe.time > 23 & foe.time < 26
-      // evade big attack
-      return melee("def")
+    ?foe.state = 33 & foe.time = 24
+      // block big attack
+      shield_block()
     auto_melee_boss()
   :?foe = phase2
     // just match elements
     disable_steal = true
     auto_melee_boss()
   :?foe = phase3
-    ?foe.state = 32 & foe.time > 90 |
-    ^foe.state = 33 & foe.time < 2
+    ?foe.state = 32 & foe.time > 90
       // prepare for attack
-      return melee("def")
+      shield_block()
     :?foe.state = 115
       ?foe.time = 60
         // dodge the orb ray
@@ -806,8 +818,7 @@ func fight_dysan()
         disable_dash = true
     :?foe.state = 106 | foe.state = 108 |
     ^foe.state = 0
-      // transitions
-      disable_abilities = true
+      shield_block()
     :?foe.state = 107 | foe.state = 32
       disable_steal = true
     auto_melee_boss()
@@ -819,19 +830,22 @@ func fight_xyloalgia()
   // Poena
   disable_steal = true
   ?foe_buffs = mirror
-    shield_block(true)
-  :?foe.state = 32 & foe.time > 40
-    shield_block(false)
+    shield_block_and_halt()
+  :?foe.state = 32 & foe.time = 41
+    shield_block()
   :
     auto_melee_boss()
 
 func fight_bolesh()
+  // Get close, debuff/use abilities, then
+  // jump to ranged before the first melee bite,
+  // and continue shooting and blocking.
   ?loc.stars > 5
     disable_steal = true
   ?foe.state = 133 &
   ^(foe.time > 12 & foe.time < 18)
-    // try to evade bites
-    shield_block(true)
+    // block bite and don't move from ranged
+    shield_block_and_halt()
   :?foe.state = 142 & foe.time > 53
     // evade melee bite
     backflip()
@@ -845,7 +859,7 @@ func fight_bolesh()
   ^foe_buffs ! "spider_buff_damage" & 
   ^(use_abilities() | debuff("dps"))
     auto_melee_boss()
-  :?mindCD <= 0 & foe_dist < 10
+  :?mindCD <= 0 & range < 10
     backflip()
   :
     ranged()
@@ -853,37 +867,31 @@ func fight_bolesh()
 func try_evade()
   ?mindCD <= 0
     return backflip()
-  return shield_block(false)
+  return shield_block()
 
 func fight_mushrooms()
+  // pellets are projectiles,
+  // so we need to factor in our distance in
+  // all timings for them :(
   disable_steal = true
+  debuff_mode = "dps"
   ?foe = phase1
-    ?foe.state = 32 & foe.time > 46
-      // big swing
+    ?foe.state = 32 & foe.time >= 48
+      // only the first swing is accurate,
+      // then its timing is affected by chill
       return try_evade()
-    :?foe.state = 33 & foe.time = 7
-      // pellets
-      return shield_block(false)
+    :?foe.state = 33
+      ?foe.time = range + 4
+        // pellets
+        return shield_block()
+      :
+         // disable abilities right before block
+        lock_abilities("shrooms")
+    return auto_melee_boss()
   :?foe = mushroom_boss_fat
-    // we're fighting both Morel and Enoki,
-    // but only Morel's state is visible.
-    // So fo Enoki we'll have to time his attacks
-    // What's worse is that they both can be
-    // stunned, which shifts their timings.
-    shroom_timer++
-    var big_swing
-    ?loc.stars < 13
-      big_swing = 59
-    :
-      big_swing = 56
-    ?foe_debuffs = stun_debuff
-      morel_stunned++
-      ?hammerCD > 0 // stuns both
-        enoki_stunned++      
-    ?foe.state = 32 & 
-    ^foe.time = (big_swing + morel_stunned)
-      // Morel's big swing is priority
-      morel_stunned = 0 // reset stun delay
+    ?foe.state = 32 & foe.time = big_swing
+      // only accurate for the first punch
+      // then it's affected by chill/stun
       return try_evade()
     :
       // Enoki's pellets fire with a set rate,
@@ -891,48 +899,38 @@ func fight_mushrooms()
       // block each of them. There's 1-frame
       // variance for the first pellet, so we 
       // block for 2 frames.
-      var pellet_rate
-      var first_pellet
+      
       ?loc.stars < 6
-        first_pellet = foe_dist + 26
+        first_pellet = range + 26
         pellet_rate = 41
       :
-        first_pellet = foe_dist + 16
+        first_pellet = range + 16
         pellet_rate = 46 - loc.stars * 2
         ?loc.stars > 12
           pellet_rate-- // hmmm?
-      var diff = shroom_timer - first_pellet - enoki_stunned
-      var should_block = diff >= 0 & 
-      ^((diff < 2) | (diff % pellet_rate < 2))
+      // effective active time of Enoki
+      var etime = shroom_timer - first_pellet 
+      ^- enoki_stunned
+      var pellet_time = etime % pellet_rate
+      ?pellet_time > 15 | etime > 15
+        ability_lock = "shrooms"
+      var should_block = etime >= 0 & 
+      ^(etime < 2 | pellet_time < 2)
       ?should_block
         enoki_stunned = 0 // reset stun delay
-        return shield_block(false)
-        //46 - 26 = 20 , but real rate=21
-        // stunned at 20, next pellet was supposed to launch at 23, but launched at 35
-        
-        // 2 -> (23) -> 35
-        // (stun 12) 51, 72, 90, 111, 132, 153, 178, 198, 219, 241, 262
-        // d5: 283, 304, 325, 346, 367, 388, 409, 430, 451, 472, 493, 507
-        // D3: 524, 544, 565, 586, 607, 628, 649
-        // ?   670,
-        // d3: 691, 712, 733, 754, 775, 796, 817, 838, 
-        // D5: 857, 878, 899, 920, 941, 962, 983, 1004, 1025, 1046
-
-        // diffs: 
-        // 21, 18, 21, 21, 21, 25, 21, 21, 21, 21
-        // 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21,
-        // 21, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21
-        // 17, 21, 21, 21, 21, 21, 21, 21, 21, 21
+        return shield_block()
   : // Enoki themself
-    ?foe.state = 33 & foe.time = foe_dist - 2
-      return shield_block(false)
+    ?(foe.state = 33 & foe.time = range - 2) |
+    ^(range > 5 & foe.state = 32 & 
+    ^(foe.time = range - 16))
+      return shield_block()
   auto_melee_boss()
 
 func fight_pallas()
   at_boss = true
   disable_steal = true
   ?foe.count > 2
-    ?foe_dist < 15 & mindCD <= 0
+    ?range < 15 & mindCD <= 0
       backflip()
     :
       elemental_aoe()
@@ -947,7 +945,7 @@ func fight_bronze_guardian()
     // hammer is down
     ?!use_abilities()
       melee("dps") // don't bother debuffing
-  :?foe_dist > 15 & foe.state = 2
+  :?range > 15 & foe.state = 2
     ranged()
 
 func fight_hrimnir()
@@ -959,10 +957,10 @@ func fight_hrimnir()
     :
       melee("dps") // don't debuff
   :?loc.stars <= 5 // try to cheese
-    ?foe_dist <= 2
+    ?range <= 2
       ?!use_abilities()
         melee("dps") // don't debuff
-    :?foe_dist <= 5
+    :?range <= 5
       // The shovel has an attack range of 1
       // so at white stars we can avoid
       // snowballs by getting close to boss.
@@ -978,7 +976,7 @@ func fight_hrimnir()
     ranged()
   :?foe.count > 1 // deal with adds
     ?slowed // don't waste time on movement
-      ?foe_dist < 7
+      ?range < 7
         auto_melee()
       :?foe.count > 2
         elemental_aoe()
@@ -1113,9 +1111,13 @@ var pickpocket_buff = "pick_pocket"
 // misc
 var at_boss = false // to deal with adds
 var naga_step = 0 // nagaraja fight
-var shroom_timer = 0 // mushrooms
-var enoki_stunned = 0 // mushrooms
-var morel_stunned = 0 // mushrooms
+// mushrooms
+var shroom_timer = 0
+var enoki_stunned = 0
+var morel_stunned = 0
+var big_swing = 0
+var pellet_rate = 0
+var first_pellet = 0
 // player status
 var stance = "unknown" // chosen combat stance
 var low_hp = false // hp < (maxhp * threshold)
@@ -1127,15 +1129,15 @@ var stunned = false // is player stunned
 var berserk = false // berserk potion TODO
 var can_aoe = false // foe.count >= aoe_treshold
 // abilities
+var ability_lock = false // prevent interruption
 var free_mind = false
-var disable_abilities = false
 var disable_steal = false
 var disable_dash = false
 var disable_bash = false
 var disable_smite = false
 // foe status
 var foe_ehp = 0 // foe.armor + foe.hp
-var foe_dist = 0 // foe.distance
+var range = 0 // foe.distance
 var foe_buffs = "" // foe.buffs.string
 var foe_debuffs = "" // foe.debuffs.string
 var is_boss = false // foe = boss
@@ -1394,21 +1396,29 @@ func parse_statuses()
 
 func prelude()
   parse_statuses()
-
   // reset/update dynamic global vars
+
   disable_steal = false
   disable_dash = false
   disable_bash = false
+  disable_smite = false
   free_mind = false
   ?stunned
-    disable_abilities = true
-  :
-    disable_abilities = false
+    ability_lock = "stun"
+  :?ability_lock
+    // clear lock after their abilities resolve
+    ?ability_lock = "bardiche" & 
+    ^(bardCD > 0 & bardCD < 870)
+      ability_lock = false
+    :?ability_lock = "hammer" &
+    ^(hammerCD > 0 & hammerCD < 647)
+      ability_lock = false
+  
   _main_hand = false
   stance = "unknown"
   low_hp = hp < (maxhp * low_hp_threshold)
   foe_ehp = foe.armor + foe.hp
-  foe_dist = foe.distance + range_down_stacks
+  range = foe.distance + range_down_stacks
   foe_buffs = foe.buffs.string
   foe_debuffs = foe.debuffs.string
   is_boss = (foe = boss)
@@ -1449,10 +1459,16 @@ func dbg(e)
       errors.Add(e)
 
 func draw_ui()
+  var sy = 22
+  ?ui_show_debug
+    sy = 20
   ?ui_show_statuses
-    >`1,22,#00A300,+ @string.Join(", ", st_good)@
-    >`1,23,#FE6800,- @string.Join(", ", st_bad)@
-    >`1,24,#F008B2,? @string.Join(", ", st_x)@
+    >`1,@sy@,#00A300,
+    ^+ @string.Join(", ", st_good)@
+    >`1,@sy+1@,#FE6800,
+    ^- @string.Join(", ", st_bad)@
+    >`1,@sy+2@,#F008B2,
+    ^? @string.Join(", ", st_x)@
 
   ?ui_show_cd
     var cd_ui_y = 6
@@ -1496,17 +1512,24 @@ func draw_ui()
       cd_ui_x++
       >`@cd_ui_x@,@cd_ui_y@,#@colorize(dashCD,
       ^can_dash())@,D
-    
-    >`1,20,#blue,Enoki timer: @shroom_timer@
-    >`1,21,#blue,Stance: @stance@
+
+    >`1,23,#blue,Lock=@ability_lock@
+    // ^t=@shroom_timer@,
+    // ^ms=@morel_stunned@,
+    // ^es=@enoki_stunned@,
+    // ^sw=@big_swing@,
+    // ^r=@pellet_rate@,
+    // ^f=@first_pellet@
+
+    >`1,24,#blue,Stance: @stance@
     ?foe
       >`1,13,#7A8F93,+ @foe_buffs@
       >`1,14,#7A8F93,id: @foe.id@
       >`1,15,#7A8F93,State: @foe.state@
       >`1,16,#7A8F93,Time: @foe.time@
-      >`1,17,#7A8F93,Dist: @foe_dist@
+      >`1,17,#7A8F93,Dist: @range@
       >`1,18,#7A8F93,Count: @foe.count@
-      >`1,25,#7A8F93,@foe@
+    >`1,25,#7A8F93,@loc.stars@* @foe@
     var ey = 2
     for err : errors
       >`15,@ey@,#red,@err@
@@ -1523,11 +1546,10 @@ func brew_pot()
   brew tar + bronze // vampiric
 
 func reset_loop()
+  ability_lock = false
+  gcd = 0
   at_boss = false
   naga_step = 0
-  shroom_timer = 0
-  enoki_stunned = 0
-  morel_stunned = 0
   cache.Clear()
   st_x.Clear()
 
@@ -1551,3 +1573,8 @@ func reset_loop()
 // test()
 draw_ui()
 // loc.Pause()
+
+// rework mushrooms by GetSymbol :(
+
+// also: each function increments a counter,
+// display average func/frame
