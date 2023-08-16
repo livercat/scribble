@@ -23,20 +23,20 @@
 // lines up correctly.
 
 // I also use a mix of conditional branching (:?)
-// and early return from functions. Early returns
+// and early return. Early returns
 // reduce line lenght and make funcs more 
 // readable. They are neat!
 
 // Main logic is in following functions:
-// draw_ui() - draws UI :)
 // prelude() - collects info from game state
 //   into global vars
 // progress() - entry point for combat logic
 //   and boss handling
 // fight() - main logic for choosing range and
-//   type of weapons/abilities
+//   fighting special non-boss enemies
 // melee(), ranged(), elemental() - equip
 //   appropriate weapons
+// draw_ui() - draws UI :)
 
 //  *** Table of Contents ***
 // You can Ctrl-F for these anchors to quickly
@@ -115,6 +115,7 @@ var elemental_items = [
   ["warhammer", 
     ["aether", "D"],
     ["fire", "dF", "D"],
+    ["poison", "D"],
   ],
   ["wand", 
     ["fire", "D"],
@@ -131,25 +132,11 @@ var elemental_items = [
   ],
   ["shield", 
     ["vigor", "ah"],
-    ["poison", "ap"],
+    ["poison", "ap", "A"],
     ["ice", "A"],
     ["default", "vigor shield ah"],
   ],
 ]
-
-// func test()
-//   _elems = ["aether"]
-//   found = get_equipment("melee", false)
-//   dbg("aether melee 1: " + found)
-//   _main_hand = found
-//   found = get_equipment("melee", false)
-//   dbg("aether melee 2: " + found)
-//   found = get_equipment("shield", false)
-//   dbg("fire shield: " + found)
-  
-//   _elems = ["ice"]
-//   found = get_equipment("shield", false)
-//   dbg("ice shield: " + found)
 
 // Items with special abilities.
 // Supported: "dashing", "bardiche", 
@@ -224,7 +211,8 @@ var max_chill = 6
 
 // Set to true if you're doing Pallas quests
 // for the Blade.
-// Stages: "bolesh", "variety"
+// Stages: "bolesh" to kill him with blade,
+//         "variety" for killing unique enemies
 var bfg_quest = false
 
 // If you're on the "variety" step of the blade
@@ -253,13 +241,18 @@ var pickpocket_quest = false
 var arm_damage = 32
 var max_pickpocket = 2
 
+// if true, will always get `max_pickpocket`
+// buff stacks even if the arm ability is on CD
+var maintain_pickpocket = false
+
 // Use if you're doing Cultist Mask
 // quests.
 // "simple" - steps 1 and 3 (uses on CD)
 // "5debuffs" - step 2 (debuffs after mask). You
 //    will have to stun yourself with grappling
-// "prevent" - step 5. Uses on CD only on bosses.
-// false - disable automatic mask usage
+// "prevent" - step 4: do it in Rocky. Script
+// will approach the scout, use mask, get hit,
+// and quit the location.
 var mask_quest = "prevent"
 
 /*********************
@@ -270,8 +263,8 @@ func progress()
     return true
   :?foe = undamageable
     return shield_block_and_halt()
-  :?range < 5 & mindCD <= 0 & foe = explode
-    return backflip()
+  :?foe = explode
+    return avoid_explosion()
   :?!is_boss & !at_boss
     // regular enemies
     free_mind = true
@@ -280,16 +273,20 @@ func progress()
   // Fight bosses
   stance = "boss combat"
   ?loc = rocky
+    ?foe = acronian_scout
+      return fight_scout()
     return fight_dysan()
-    // TODO handle courier boss
   :?loc = deadwood
     return fight_xyloalgia()
-    // TODO epic_snail
   :?loc = caves
     return fight_bolesh()
     // TODO ceiling decorator
   :?loc = fungus_forest_boss
     return fight_mushrooms()
+  :?loc = mushroom
+    ?foe.id = "epic_snail"
+      auto_melee()
+    // fluff is handled in avoid_explosion()
   :?loc = undead_crypt_boss
     return fight_pallas()
   :?loc = bronze_guardian
@@ -298,13 +295,10 @@ func progress()
     return fight_hrimnir()
   :?loc = nagaraja
     return fight_nagajara()
-  
-  // minibosses
-  ?foe.id = "epic_snail" | foe.id = "fluff"
-    auto_melee()
   :
     // unknown boss
-    dbg("Fighting unknown boss, foe.id="+foe.id)
+    dbg("Fighting unknown boss")
+    loc.Pause()
     auto_melee_boss()
 
 func idle()
@@ -324,7 +318,7 @@ func idle()
     equipR @found@
 
 func healwalk()
-  ?foe & range < 23
+  ?foe & eff_dist < 23
     ?hp < (maxhp / 4) & item.potion ! empty &
     ^(item.potion = "healing" | 
     ^item.potion = "vampiric")
@@ -338,12 +332,18 @@ func healwalk()
   stance = "out of combat"
   return true // continue healwalking
 
+func avoid_explosion()
+  ?foe_dist < 5
+    return try_evade()
+  ?foe.id = "fluff" & foe.state = 2 & foe.time > 3
+    return melee("def")
+
 /********************
 **     #Combat    **
 ********************/
 func fight()
   // chooses general approach to the combat
-  ?prefer_ranged & range < 10 & 
+  ?prefer_ranged & foe_dist < 10 & 
   ^can_backflip()
     return backflip()
   :?phys_immune
@@ -364,7 +364,7 @@ func auto_melee()
     return debuff("def")
   ?use_abilities()
     return true
-  :?melee_aoe_weapon & can_aoe & range < 8
+  :?melee_aoe_weapon & can_aoe & eff_dist < 8
     return melee("aoe")
   :?low_hp & use_shield_on_low_hp
     return melee("def")
@@ -375,7 +375,7 @@ func auto_melee()
 func melee(mode)
   ?come_closer()
     return true
-  ?range > 7
+  ?eff_dist > 7 // get into range
     mode = "def"
   var offhand
   ?mode = "dps"
@@ -418,7 +418,7 @@ func come_closer()
 func auto_ranged()
   ?use_abilities()
     return true
-  :?ranged_aoe_weapon & can_aoe & range <= 16
+  :?ranged_aoe_weapon & can_aoe & eff_dist <= 16
     return elemental_aoe()
   :?ranged_st_weapon
     return ranged()
@@ -491,15 +491,17 @@ func elemental_aoe()
     ^"): no offhand found")
 
 func can_dash()
-  return !disable_dash & 
-  ^range > 10 & range < 17 &
+  return can("dash") & !disable_dash & 
+  ^eff_dist > 10 & eff_dist < 17 &
   ^(bashCD <= 0 | dashCD <= 0) &
   ^can_activate()
 
 func dash()
   ?!disable_bash & have_bashing & bashCD <= 0
+    stance = "bashing"
     equipR bashing
   :?dashCD <= 0 & have_dashing
+    stance = "dashing"
     equipR dashing
   return true
 
@@ -572,22 +574,6 @@ func debuff(mode)
     return true
   return false
 
-func aac(weapon)
-  // attack animation cancelling:
-  // equipping a different weapon
-  // right after the attack cancels
-  // the backswing animation,
-  // effectively increasing your
-  // attack speed
-  ?weapon = "heavy hammer"
-    // clips itself too much
-    equip heavy hammer
-    return
-  ?ai.idle & !berserk & !slowed
-    equip wand
-  equip @weapon@
-  return true
-
 /********************
 **    #Abilities   **
 ********************/
@@ -600,17 +586,19 @@ func aac(weapon)
 // <something>() actually uses trues to use
 //   the ability without doing checks itself
 
+func can(ability)
+  return !ability_lock | 
+  ^string.Equals(ability_lock, ability)
+
 // quarterstaff
 func can_qs_dash()
-  return !ability_lock & !disable_dash & 
+  return can("qs") & !disable_dash & 
   ^staffCD <= 0 & can_activate()
 
 // quarterstaff
 func should_qs_dash()
-  return (prefer_ranged & range > 28 |
-  ^range > 16 |
-  ^is_boss & !(foe = immune_to_stun)) &
-  ^can_qs_dash()
+  return (prefer_ranged & eff_dist > 28) |
+  ^eff_dist > 16 & can_qs_dash()
 
 // quarterstaff
 func qs_dash()
@@ -624,7 +612,7 @@ func qs_dash()
 func can_backflip()
   // don't check this condition
   // for boss mechanics (when free_mind is false)
-  return !ability_lock & free_mind & 
+  return can("mind") & free_mind & 
   ^mindCD <= 0 &
    // don't jump into the wall
   ^screen.FromWorldX(pos.x) > 5
@@ -641,10 +629,11 @@ func backflip()
 
 // skeleton arm
 func can_slap()
-  ?ability_lock | !have_arm | range > 6 |
+  ?!can("arm") | !have_arm | eff_dist > 6 |
   ^phys_immune
     return false
-  ?pickpocket_stacks < max_pickpocket & 
+  ?(pickpocket_quest | maintain_pickpocket) &
+  ^(pickpocket_stacks < max_pickpocket) & 
   ^!slowed & !low_hp
     return true // get to max buffs
   return have_arm & armCD <= 0 & !disable_steal &
@@ -667,10 +656,10 @@ func slap()
 
 // blade of the fallen god
 func can_smite()
-  return !ability_lock & 
+  return can("smite") & 
   ^have_blade & smiteCD <= 0 &
   ^!disable_smite & 
-  ^range <= 20 & (foe ! pallas) & // immune
+  ^eff_dist <= 20 & (foe ! pallas) & // immune
   ^can_activate()
 
 // blade of the fallen god
@@ -696,8 +685,8 @@ func smite()
 
 // heavy hammer
 func can_hammer()
-  return !ability_lock & have_ham & 
-  ^!phys_immune & range <= 7 &
+  return can("hammer") & have_ham & 
+  ^!phys_immune & eff_dist <= 7 &
   ^(hammerCD <= 0 | hammerCD >= 647) &
   ^can_activate()
 
@@ -717,14 +706,14 @@ func hammer()
 
 // bardiche
 func can_bard()
-  return !ability_lock & have_bard & 
-  ^range <= 9 & !phys_immune
+  return can("bardiche") & have_bard & 
+  ^eff_dist <= 9 & !phys_immune &
   ^(bardCD <= 0 | bardCD >= 870) &
   ^can_activate()
 
 // bardiche
 func should_bard()
-  return is_boss & can_bard()
+  return can_bard()
 
 // bardiche
 func bardiche()
@@ -737,7 +726,7 @@ func bardiche()
 
 // mask
 func can_mask()
-  return !ability_lock & have_mask & 
+  return can("mask") & have_mask & 
   ^maskCD <= 0 & can_activate()
 
 // mask
@@ -756,8 +745,6 @@ func use_abilities()
   // prioritize quests
   ?mask_quest = "simple" & can_mask()
     return mask()
-  ?mask_quest = "prevent" & should_mask()
-    return mask()
   ?pickpocket_quest & can_slap()
     return slap()
   // then use where needed
@@ -773,6 +760,32 @@ func use_abilities()
 
 func can_activate()
   return ai.enabled & item.CanActivate()
+
+func aac(weapon)
+  // attack animation cancelling:
+  // equipping a different weapon
+  // right after the attack cancels
+  // the backswing animation,
+  // effectively increasing your
+  // attack speed
+  equip @weapon@
+  ?!berserk & !slowed & ai.idle
+    // sometimes dashing/bashing seem to have
+    // weird behavior: after dash/bash ai.idle
+    // will not become false even after using
+    // other abilities. it interrupts hammer R,
+    // bardiche R, and some weapon attacks
+    // i have no idea what really causes it,
+    // but at least don't interrupt R's
+    ?string.Equals(weapon, "heavy hammer") &
+    ^hammer_swing
+      return false
+    :?string.Equals(weapon, "bardiche") &
+    ^bardiche_swing
+      return false
+    equip wand
+  equip @weapon@
+  return true
 
 /*****************
 **    #Bosses   **
@@ -793,6 +806,14 @@ func shield_block_and_halt()
   stance = "shield block and halt"
   equipL quest
   equipR @evade_shield@
+
+func fight_scout()
+  ?mask_quest = "prevent"
+    equipL quest
+    equipR mask
+
+  :
+    dbg("TODO")
 
 func fight_dysan()
   ?foe = phase1
@@ -859,7 +880,7 @@ func fight_bolesh()
   ^foe_buffs ! "spider_buff_damage" & 
   ^(use_abilities() | debuff("dps"))
     auto_melee_boss()
-  :?mindCD <= 0 & range < 10
+  :?mindCD <= 0 & foe_dist < 10
     backflip()
   :
     ranged()
@@ -870,67 +891,55 @@ func try_evade()
   return shield_block()
 
 func fight_mushrooms()
-  // pellets are projectiles,
-  // so we need to factor in our distance in
-  // all timings for them :(
   disable_steal = true
-  debuff_mode = "dps"
+  ?ability_lock = "shrooms"
+    ability_lock = false
   ?foe = phase1
-    ?foe.state = 32 & foe.time >= 48
+    ?foe.state = 32 & foe.time = 48
       // only the first swing is accurate,
       // then its timing is affected by chill
       return try_evade()
+    :?foe.state = 32 & foe.time > (48 - 15)
+      // prevent interrupts
+      lock_abilities("shrooms")
     :?foe.state = 33
-      ?foe.time = range + 4
+      // V = 1 frame / sec
+      ?foe.time = foe_dist + 4
         // pellets
         return shield_block()
       :
-         // disable abilities right before block
+        // prevent interrupts
         lock_abilities("shrooms")
-    return auto_melee_boss()
   :?foe = mushroom_boss_fat
-    ?foe.state = 32 & foe.time = big_swing
-      // only accurate for the first punch
-      // then it's affected by chill/stun
-      return try_evade()
+    ?loc.stars < 11
+      big_swing = 56
     :
-      // Enoki's pellets fire with a set rate,
-      // and start at the set time, so we can
-      // block each of them. There's 1-frame
-      // variance for the first pellet, so we 
-      // block for 2 frames.
-      
-      ?loc.stars < 6
-        first_pellet = range + 26
-        pellet_rate = 41
-      :
-        first_pellet = range + 16
-        pellet_rate = 46 - loc.stars * 2
-        ?loc.stars > 12
-          pellet_rate-- // hmmm?
-      // effective active time of Enoki
-      var etime = shroom_timer - first_pellet 
-      ^- enoki_stunned
-      var pellet_time = etime % pellet_rate
-      ?pellet_time > 15 | etime > 15
-        ability_lock = "shrooms"
-      var should_block = etime >= 0 & 
-      ^(etime < 2 | pellet_time < 2)
-      ?should_block
-        enoki_stunned = 0 // reset stun delay
-        return shield_block()
+      big_swing = 59
+    ?foe.state = 32
+      ?foe.time = big_swing
+        // only accurate for the first punch
+        // then it's affected by chill/stun
+        return try_evade()
+      :?foe.time > (big_swing - 15)
+        // prevent interrupts
+        lock_abilities("shrooms")
+    :
+      auto_melee_boss()
+    // TODO detect pellets
   : // Enoki themself
-    ?(foe.state = 33 & foe.time = range - 2) |
-    ^(range > 5 & foe.state = 32 & 
-    ^(foe.time = range - 16))
-      return shield_block()
+    ?eff_dist > 6
+      ?!come_closer()
+        melee("def")
+    :
+      auto_melee_boss()
+    // TODO detect pellets
   auto_melee_boss()
 
 func fight_pallas()
   at_boss = true
   disable_steal = true
   ?foe.count > 2
-    ?range < 15 & mindCD <= 0
+    ?foe_dist < 15 & mindCD <= 0
       backflip()
     :
       elemental_aoe()
@@ -945,7 +954,7 @@ func fight_bronze_guardian()
     // hammer is down
     ?!use_abilities()
       melee("dps") // don't bother debuffing
-  :?range > 15 & foe.state = 2
+  :?foe_dist > 15 & foe.state = 2
     ranged()
 
 func fight_hrimnir()
@@ -957,21 +966,18 @@ func fight_hrimnir()
     :
       melee("dps") // don't debuff
   :?loc.stars <= 5 // try to cheese
-    ?range <= 2
+    ?foe_dist <= 2
       ?!use_abilities()
         melee("dps") // don't debuff
-    :?range <= 5
+    :?foe_dist <= 5
       // The shovel has an attack range of 1
       // so at white stars we can avoid
       // snowballs by getting close to boss.
       // on higher stars he blows you away
       // immediately
       equip shovel
-    : // blown away
-      ?slowed
-        ranged()
-      :
-        auto_melee()
+    : // blown away, get back
+      auto_melee()
   :?foe.state = 143 | foe.state = 144 // blowing
     ranged()
   :?foe.count > 1 // deal with adds
@@ -1111,13 +1117,7 @@ var pickpocket_buff = "pick_pocket"
 // misc
 var at_boss = false // to deal with adds
 var naga_step = 0 // nagaraja fight
-// mushrooms
-var shroom_timer = 0
-var enoki_stunned = 0
-var morel_stunned = 0
-var big_swing = 0
-var pellet_rate = 0
-var first_pellet = 0
+var big_swing = 0 // mushrooms
 // player status
 var stance = "unknown" // chosen combat stance
 var low_hp = false // hp < (maxhp * threshold)
@@ -1137,11 +1137,20 @@ var disable_bash = false
 var disable_smite = false
 // foe status
 var foe_ehp = 0 // foe.armor + foe.hp
-var range = 0 // foe.distance
+var foe_dist = 0 // foe_dist
+var eff_dist = 0 // foe_dist + range_debuff
 var foe_buffs = "" // foe.buffs.string
 var foe_debuffs = "" // foe.debuffs.string
 var is_boss = false // foe = boss
 var phys_immune = false // immune to physical
+// hit tracking
+var enable_hit_tracking = false
+var last_frame_dist = 0
+var last_frame_armor = 0
+var last_frame_hp = 0
+var last_frame_foe = ""
+var last_frame_dist = 0
+var last_frame_state = -1
 // cooldowns
 var mindCD = 0
 var staffCD = 0
@@ -1152,6 +1161,8 @@ var hammerCD = 0
 var smiteCD = 0
 var bardCD = 0
 var maskCD = 0
+var bardiche_swing = 0
+var hammer_swing = 0
 
 // Pre-define vars for internal functions.
 var found = false
@@ -1394,54 +1405,35 @@ func parse_statuses()
 
         i = i + 3
 
+func track_hits()
+  var hp_diff = last_frame_hp - hp
+  ?hp_diff > 0
+    >`15,2,#red,Got hit!
+    >`15,3,Last frame info:
+    >`15,4,last_frame_hp=@last_frame_hp@ (diff=
+    ^@hp_diff@), 
+    ^last_frame_armor=@last_frame_armor@
+    >`15,5,id=@last_frame_foe@
+    >`15,6,dist=@last_frame_dist@
+    >`15,7,state=@last_frame_state@
+  last_frame_armor = armor
+  last_frame_hp = hp
+  last_frame_foe = foe.id
+  last_frame_dist = foe_dist
+  last_frame_state = foe.state
+
 func prelude()
   parse_statuses()
-  // reset/update dynamic global vars
 
+  ?enable_hit_tracking
+    track_hits()
+
+  // reset/update dynamic global vars
   disable_steal = false
   disable_dash = false
   disable_bash = false
   disable_smite = false
   free_mind = false
-  ?stunned
-    ability_lock = "stun"
-  :?ability_lock
-    // clear lock after their abilities resolve
-    ?ability_lock = "bardiche" & 
-    ^(bardCD > 0 & bardCD < 870)
-      ability_lock = false
-    :?ability_lock = "hammer" &
-    ^(hammerCD > 0 & hammerCD < 647)
-      ability_lock = false
-  
-  _main_hand = false
-  stance = "unknown"
-  low_hp = hp < (maxhp * low_hp_threshold)
-  foe_ehp = foe.armor + foe.hp
-  range = foe.distance + range_down_stacks
-  foe_buffs = foe.buffs.string
-  foe_debuffs = foe.debuffs.string
-  is_boss = (foe = boss)
-  phys_immune = (foe = immune_to_physical)
-  can_aoe = (foe.count >= aoe_treshold) & !low_hp
-
-  ?loc = halls | foe = aether
-    _elems = ["vigor", "fire", "ice", "poison"]
-  :?loc = mine | foe = fire
-    _elems = ["aether", "ice", 
-    "poison", "vigor"]
-  :?loc = ridge | foe = ice
-    _elems = ["fire", "aether", 
-    "poison", "vigor"]
-  :?loc = caves | loc = temple | foe = poison
-    _elems = ["ice", "aether", 
-    "fire", "vigor"]
-  :?loc = mushroom | foe = vigor
-    _elems = ["poison", "aether", 
-    "fire", "ice"]
-  :
-    _elems = ["default", "vigor", "aether", 
-    "fire", "ice", "poison"]
 
   mindCD = item.GetCooldown("mind")
   staffCD = item.GetCooldown("quarterstaff")
@@ -1452,6 +1444,49 @@ func prelude()
   smiteCD = item.GetCooldown("blade")
   bardCD = item.GetCooldown("bardiche")
   maskCD = item.GetCooldown("mask")
+
+  hammer_swing = hammerCD >= 647
+  bardiche_swing = bardCD >= 870
+
+  ?stunned
+    ability_lock = "stun"
+  :?ability_lock
+    // clear the locks after they're done
+    ?(ability_lock = "stun") |
+
+    ^(ability_lock = "bardiche" & 
+    ^!bardiche_swing) |
+
+    ^(ability_lock = "hammer" &
+    ^!hammer_swing)
+      ability_lock = false
+  
+  _main_hand = false
+  stance = "unknown"
+  low_hp = hp < (maxhp * low_hp_threshold)
+  foe_ehp = foe.armor + foe.hp
+  foe_dist = foe.distance  
+  eff_dist = foe_dist + range_down_stacks
+  foe_buffs = foe.buffs.string
+  foe_debuffs = foe.debuffs.string
+  is_boss = (foe = boss)
+  phys_immune = (foe = immune_to_physical)
+  can_aoe = (foe.count >= aoe_treshold) & !low_hp
+
+  ?loc = halls | foe = aether
+    _elems = ["vigor", "fire", "ice", "poison"]
+  :?loc = mine | foe = fire
+    _elems = ["aether", "ice", "poison", "vigor"]
+  :?loc = ridge | foe = ice
+    _elems = ["fire", "aether", 
+    "poison", "vigor"]
+  :?loc = caves | loc = temple | foe = poison
+    _elems = ["ice", "aether", "fire", "vigor"]
+  :?loc = mushroom | foe = vigor
+    _elems = ["poison", "aether", "fire", "ice"]
+  :
+    _elems = ["default", "vigor", "aether", 
+    "fire", "ice", "poison"]
 
 func dbg(e)
   ?ui_show_debug
@@ -1513,13 +1548,8 @@ func draw_ui()
       >`@cd_ui_x@,@cd_ui_y@,#@colorize(dashCD,
       ^can_dash())@,D
 
-    >`1,23,#blue,Lock=@ability_lock@
-    // ^t=@shroom_timer@,
-    // ^ms=@morel_stunned@,
-    // ^es=@enoki_stunned@,
-    // ^sw=@big_swing@,
-    // ^r=@pellet_rate@,
-    // ^f=@first_pellet@
+    >`1,23,#blue,Lock=@ability_lock@,ai.idle=
+    ^@ai.idle@,dashCD=@dashCD@,bashCD=@bashCD@
 
     >`1,24,#blue,Stance: @stance@
     ?foe
@@ -1527,9 +1557,11 @@ func draw_ui()
       >`1,14,#7A8F93,id: @foe.id@
       >`1,15,#7A8F93,State: @foe.state@
       >`1,16,#7A8F93,Time: @foe.time@
-      >`1,17,#7A8F93,Dist: @range@
+      >`1,17,#7A8F93,Dist: @foe_dist@
       >`1,18,#7A8F93,Count: @foe.count@
-    >`1,25,#7A8F93,@loc.stars@* @foe@
+    >`1,25,#7A8F93,@loc.stars@* 
+    ^@time.FormatDigital(totaltime)@ @foe@
+
     var ey = 2
     for err : errors
       >`15,@ey@,#red,@err@
@@ -1547,22 +1579,36 @@ func brew_pot()
 
 func reset_loop()
   ability_lock = false
-  gcd = 0
   at_boss = false
   naga_step = 0
   cache.Clear()
   st_x.Clear()
 
+// func test()
+//   _elems = ["aether"]
+//   found = get_equipment("melee", false)
+//   dbg("aether melee 1: " + found)
+//   _main_hand = found
+//   found = get_equipment("melee", false)
+//   dbg("aether melee 2: " + found)
+//   found = get_equipment("shield", false)
+//   dbg("fire shield: " + found)
+  
+//   _elems = ["ice"]
+//   found = get_equipment("shield", false)
+//   dbg("ice shield: " + found)
+
 /****************
 **   #Runtime  **
 ****************/
 ?loc.begin
-  ?loc = caves | loc = halls
-    prefer_ranged = true
+  // enable_hit_tracking = true
+  // ?loc = caves | loc = halls
+  //   prefer_ranged = true
   _fill_status_uids()
   _fill_items_cache()
-  ?item.potion = empty
-    brew_pot()
+  // ?item.potion = empty
+  //   brew_pot()
 :?loc.loop
   reset_loop()
 :?ai.enabled & !ai.paused
@@ -1573,8 +1619,3 @@ func reset_loop()
 // test()
 draw_ui()
 // loc.Pause()
-
-// rework mushrooms by GetSymbol :(
-
-// also: each function increments a counter,
-// display average func/frame
