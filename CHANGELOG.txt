@@ -1,3 +1,16 @@
+Version 1.2
+ - Majorer reorganization and clean up!
+ - Weapons are easier to configure and support.
+   all weapon types, multiple weapons per element,
+   as well as non-elemental weapons.
+ - Fixed most (all) cases where abilities 
+   interrupted each other.
+ - Added many more settings, including support
+   for some specific item quests.
+ - Improved many boss fights and regular locations
+ - BROKEN: Dysangelos fight is currently quite broken,
+   I'll fix it sometime soon.
+
 Version 1.1
 - Major reorganization and clean up
 - Added more code comments

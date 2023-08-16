@@ -1,37 +1,12 @@
 // "scribble"
 // StoneScript automation for Stone Story RPG
-// Ver. 1.1
+// Ver. 1.2
 // Project: https://github.com/livercat/scribble
 // by livercat
 
 /***************
 **  #Intro    **
 ***************/
-// Adjust weapons and runtime settings below
-// to suit your items and progress.
-// Almost all weapons are optional, but you do
-// need to set at least these:
-// `ranged_2h`, `best_1h`, `default_sh`.
-// `best_wand` is required for Boos in Halls
-
-// Supported weapon types:
-// - for abilities:
-//   heavy hammer, bardiche, dashing shield,
-//   quarterstaff, mindstone, bashing shield,
-//   skeleton arm, blade of the fallen god
-// - for ranged elemental and aoe:
-//   all wands
-// - for ranged single-target:
-//   repeating crossbow
-// - for 1h-melee:
-//   all 1h-swords, all warhammers, all shields
-// - for 2h-melee:
-//   any weapon, but without elemental switching
-// Unsupported:
-// - elemental staffs
-// - Equipping two 1-handed weapons of the 
-//   same element
-
 // Some variable names are shorter
 // than I would prefer for readability,
 // but Mindstone has line limit of 49 chars
@@ -48,20 +23,20 @@
 // lines up correctly.
 
 // I also use a mix of conditional branching (:?)
-// and early return from functions. Early returns
+// and early return. Early returns
 // reduce line lenght and make funcs more 
 // readable. They are neat!
 
 // Main logic is in following functions:
-// draw_ui() - draws UI :)
 // prelude() - collects info from game state
 //   into global vars
 // progress() - entry point for combat logic
 //   and boss handling
 // fight() - main logic for choosing range and
-//   type of weapons/abilities
-// melee(), ranged(), aoe(), elem() - equip
+//   fighting special non-boss enemies
+// melee(), ranged(), elemental() - equip
 //   appropriate weapons
+// draw_ui() - draws UI :)
 
 //  *** Table of Contents ***
 // You can Ctrl-F for these anchors to quickly
@@ -77,7 +52,6 @@
 //   #Bosses - specific boss mechanics
 //   #Internals - var declarations and boring
 //                internal functions
-//   #WeaponCache - we don't talk about that :<
 //   #Runtime - actual place where the script is 
 //              executed
 
@@ -85,101 +59,201 @@
 /***************
 **  #Weapons  **
 ***************/
+// Each elemental weapon aside from staffs
+// and warhammers has two variants: "D" or "dX",
+// where "X" is the elemental modifier
+// ("A" and "ax" for shields).
+// Staffs and warhammers instead have six! 
+// "A", "D", "ax", "aX", "dx", "dX".
+// You can mutate between them using moondial.
 
-// shields
-var aether_shield = ""
-var fire_shield = ""
-var ice_shield = "ice shield A"
-var poison_shield = "poison shield ap"
-var vigor_shield = "vigor shield ah"
-var dashing = "dashing shield"
+// Meaning of letters in suffix:
+// "A": get armor on egage for each foe
+// "D": attack bonus vs correct element
+// "x": on being hit, chance to: unmake (aether),
+//      fire dot, chill (ice), +attack (poison),
+//      heal (vigor)
+// "X": on attack, chance to: unmake (aether),
+//      fire dot, chill (ice), lifesteal (vigor),
+//      reduce foe attack (poison)
 
-// one-handed melee
-var aether_1h = "aether sword D"
-var fire_1h = "fire sword dF"
-var ice_1h = "ice sword dI"
-var poison_1h = "posion sword dP"
-var vigor_1h = "vigor sword dL"
+// Full list of suffixes:
+// Defensive: staffs, warhammers, shields
+//   "au", "af", "ai", "ap", "ah", "A"
+// Offensive: staffs, warhammers, swords, xbows
+//   "dU", "dF", "dI", "dP", "dL", "D"
+// Exclusive to staffs and warhammers:
+//   "aU", "aF", "aI", "aP", "aL",
+//   "du", "df", "di", "dp", "dh"
 
-// anti-armor melee
-var aether_aa = "aether hammer D"
-var fire_aa = ""
-var ice_aa = ""
-var poison_aa = ""
-var vigor_aa = ""
+// Note that vigor has 2 different letters:
+// "L" for offensive lifesteal and "h" for
+// defensive "heal on being hit".
+// There are no "l" or "H" modifiers.
 
-// one-handed ranged
-var aether_wand = ""
-var fire_wand = "fire wand D"
-var ice_wand = ""
-var poison_wand = "poison wand D"
-var vigor_wand = "vigor wand D"
+// Fill `elemental_items` with your items.
+// Format:
+// ["weapon type", 
+//   ["element1", "suffix + enchant", ...],
+//   ["element2", "suffix1", .., "suffixN"],
+// ]
+// Only list items that you actually want to use,
+// otherwise script can grab a random *0 that
+// you got from a chest. Also list suffixes by
+// priority: better ones first. Multiple copies
+// of the same suffix for the same item
+// will be ignored.
+// "default" items will be used if no suitable 
+// elemental weapon is found, and against
+// non-elemental enemies. They must be 
+// written with their full names.
+// If no "default" items are listed for 
+// a category, then items from other elements
+// will be used (but not the enemy's element).
 
-// 2-handed weapons
-var ranged_2h = "repeating crossbow"
-var melee_aoe = "bardiche"
+var elemental_items = [
+  ["warhammer", 
+    ["aether", "D + 1", "D + 3"],
+    ["fire", "dF", "D"],
+    ["poison", "D"],
+  ],
+  ["wand", 
+    ["fire", "D"],
+    ["poison", "D"],
+    ["vigor", "dL"],
+  ],
+  ["sword", 
+    ["aether", "D"],
+    ["fire", "dF", "D"],
+    ["ice", "dI"],
+    ["poison", "dP"],
+    ["vigor", "dL"],
+    ["default", "vigor sword dL"],
+  ],
+  ["shield", 
+    ["vigor", "ah"],
+    ["poison", "ap", "A"],
+    ["ice", "A"],
+    ["default", "vigor shield ah"],
+  ],
+]
 
-// items with abilities
-var heavy_ham = "heavy hammer"
-var bard = "bardiche"
-// lost items
-var bashing = "bashing shield"
-var blade = "blade of the fallen god"
-var arm = "skeleton arm"
-var mask = ""
+// Items with special abilities.
+// Supported: "dashing", "bardiche", 
+// "heavy hammer"
+var special_items = [
+  "dashing", "bardiche", "heavy hammer",
+]
 
-// your best weapons
-var best_1h = vigor_1h
-var best_1h_offhand = fire_1h
-var best_aa = aether_aa
-var best_aa_offhand = ""
-var best_wand = poison_wand
-var best_wand_offhand = fire_wand
-var best_shield = vigor_shield
+// Lost Items
+// Supported: bashing, blade, arm, mask
+var lost_items = [
+  "bashing", "blade", "arm", "mask"
+]
+
+// full name of the shield with the highest
+// evade%
+var evade_shield = "vigor ah"
+
+// Weapon type to prefer for melee aoe:
+// "staff", "bardiche", "heavy hammer" will 2h.
+// "wands", "big swords" will dual-wield 1h.
+// "" will disable melee aoe and will dual-wield
+// or 1h + shield.
+var melee_aoe_weapon = "bardiche"
+
+// Weapon type to prefer for ranged aoe.
+// "staff" will 2h, "wands" will dual-wield 1h.
+// "" will disable ranged aoe and will 
+// move into melee range.
+var ranged_aoe_weapon = "wands"
+
+// Ranged single target weapon.
+// "repeating" will 2h.
+// "xbows", "wands" will dual-wield.
+var ranged_st_weapon = "repeating"
 
 /*********************
 **     #Settings    **
 *********************/
+// Show ability cooldowns
+var ui_show_cd = true
 
-// how many regular enemies are needed
+// Show your buffs/debuffs
+var ui_show_statuses = true
+
+// Show debug info (noisy, useful for research)
+var ui_show_debug = false
+
+// How many regular enemies are needed
 // to start using AOE weapons instead of
 // single target
 var aoe_treshold = 4
 
-// depends on * level of Blade of the Fallen God
-var smite_damage = 80
+// Low HP threshold, fraction of 1.
+// When on low HP, will prioritize ah shields
+// and dL weapon over matching element.
+// If 1, will try to lifesteal to max (useful
+// to get rid of zone cross).
+// If -1, will never lifesteal.
+var low_hp_threshold = 0.5
 
-// at least this many enemies must be present
+// If true, then will prefer 1h+shield in melee
+// over dual-wield when on low HP.
+var use_shield_on_low_hp = true
+
+// Slower but safer, useful if you don't have 
+// good melee weapons, but have a repeating xbow
+var prefer_ranged = false
+
+// Find a suitable amount based on your dI weapon
+var max_chill = 6
+
+// Set to true if you're doing Pallas quests
+// for the Blade.
+// Stages: "bolesh" to kill him with blade,
+//         "variety" for killing unique enemies
+var bfg_quest = false
+
+// If you're on the "variety" step of the blade
+// quest, fill this array with names of the
+// enemies you've already defeated. You can take 
+// a screenshot of your R&D journal in game with
+// the defeated foes and then OCR it.
+// For example, on iOS you can just select and 
+// copy text in the default Photo app.
+var bfg_defeated_foes = ["example", "example 2"]
+
+// Depends on level/enchants of the Blade
+var smite_damage = 85
+
+// At least this many enemies must be present
 // to trigger Smite
 var smite_treshold = 7
 
-// depends on spd of your ice sword dI
-var max_chill = 6
-
-// set to true if you're doing 
-// Skeletal Arm quests.
-// it will prioritize pickpocketing in combat,
-// and will try to only use it to finish off foes
+// Set to true if you're doing Skeleton Arm
+// quests. It will prioritize pickpocketing in 
+// combat, and will try to only use it when 
+// non-boss foes will die from the ability.
 var pickpocket_quest = false
 
-// depends on * level of Skeleton Arm
+// These depend on level/enchants of the Arm
 var arm_damage = 32
-
-// depends on * level of Skeleton Arm
 var max_pickpocket = 2
 
-// slower but safer, especially if you don't
-// have good vigor shield and weapon
-var prefer_ranged = false
+// if true, will always get `max_pickpocket`
+// buff stacks even if the arm ability is on CD
+var maintain_pickpocket = false
 
-// show ability cooldowns
-var ui_show_cd = true
-
-// show your buffs/debuffs
-var ui_show_statuses = true
-
-// show debug info (useful for research)
-var ui_show_debug = true
+// Use if you're doing Cultist Mask
+// quests.
+// "simple" - steps 1 and 3 (uses on CD)
+// "5debuffs" - step 2 (debuffs after mask). You
+//    will have to stun yourself with grappling
+// "prevent" - step 4: do it in Rocky. Script
+// will approach the scout, use mask, get hit,
+// and quit the location.
+var mask_quest = false
 
 /*********************
 **     #Progress    **
@@ -188,49 +262,63 @@ func progress()
   ?healwalk() // no enemies nearby
     return true
   :?foe = undamageable
-    shield_block(true)
+    return shield_block_and_halt()
+  :?foe = explode
+    return avoid_explosion()
   :?!is_boss & !at_boss
     // regular enemies
     free_mind = true
     return fight()
 
-  // only bosses below
+  // Fight bosses
   stance = "boss combat"
-  ?loc = rocky // TODO handle courier boss
-    fight_dysan()
+  ?loc = rocky
+    ?foe = acronian_scout
+      return fight_scout()
+    return fight_dysan()
   :?loc = deadwood
-    fight_xyloalgia()
+    return fight_xyloalgia()
   :?loc = caves
-    fight_bolesh() // TODO ceiling decorator
+    return fight_bolesh()
+    // TODO ceiling decorator
   :?loc = fungus_forest_boss
-    fight_mushroom()
+    return fight_mushrooms()
+  :?loc = mushroom
+    ?foe.id = "epic_snail"
+      auto_melee()
+    // fluff is handled in avoid_explosion()
   :?loc = undead_crypt_boss
-    fight_pallas()
+    return fight_pallas()
   :?loc = bronze_guardian
-    fight_bronze_guardian()
+    return fight_bronze_guardian()
   :?loc = icy_ridge
-    fight_hrimnir()
+    return fight_hrimnir()
   :?loc = nagaraja
-    fight_nagajara()
+    return fight_nagajara()
   :
     // unknown boss
-    melee_boss("auto")
+    dbg("Fighting unknown boss")
+    loc.Pause()
+    auto_melee_boss()
 
 func idle()
   stance = "out of combat"
   ?pickup.distance < 8
     equipL star
     equipR triskelion
+    return
+  :?can_qs_dash()
+    return qs_dash()
   :?hp < maxhp
     equipL ouroboros
-    shield()
   :
     equipL triskelion
-    shield()
-  return true
+  found = get_equipment("shield", false)
+  ?found
+    equipR @found@
 
 func healwalk()
-  ?foe & foe_dist < 23
+  ?foe & eff_dist < 23
     ?hp < (maxhp / 4) & item.potion ! empty &
     ^(item.potion = "healing" | 
     ^item.potion = "vampiric")
@@ -239,255 +327,183 @@ func healwalk()
   :?pickup.distance < 8
     equipL star
     equipR triskelion
-  :?can_qs_dash()
-    qs_dash()
   :
     idle()
   stance = "out of combat"
   return true // continue healwalking
 
+func avoid_explosion()
+  ?foe_dist < 5
+    return try_evade()
+  ?foe.id = "fluff" & foe.state = 2 & foe.time > 3
+    return melee("def")
+
 /********************
 **     #Combat    **
 ********************/
-// TODO: need to move wands out of ranged into aoe or elemental
 func fight()
   // chooses general approach to the combat
-  ?foe_dist < 7 & mindCD <= 0 & foe = explode
+  ?prefer_ranged & foe_dist < 10 & 
+  ^can_backflip()
     return backflip()
-  :?phys_immune | foe = magic_vulnerability
+  :?phys_immune
     return auto_elemental()
-  :?foe_dist < 8 & pickpocket_quest 
-  ^& should_slap()
-    return slap() // prioritize skeleton quest
   :?must_melee_foe()
     return auto_melee()
-  :?prefer_ranged | must_ranged_foe()
-    return auto_ranged()
-  :?foe_dist > 16 | (foe_dist > 10 & can_aoe)
+  :?ranged_st_weapon & 
+  ^(prefer_ranged | must_ranged_foe())
     return auto_ranged()
   :
     return auto_melee()
 
 func auto_melee()
+  ?mask_quest = "5debuffs"
+    equipR mask
+    ?can_mask()
+      return mask()
+    return debuff("def")
   ?use_abilities()
     return true
-  :?low_hp
+  :?melee_aoe_weapon & can_aoe & eff_dist < 8
+    return melee("aoe")
+  :?low_hp & use_shield_on_low_hp
     return melee("def")
-  :?can_aoe & foe_dist < 8
-    return aoe("melee")
   :
     return melee("dps")
 
-// mode: "dps" | "def"
+// mode: "dps" | "def" | "aoe"
 func melee(mode)
-  ?foe_dist > 16 & can_qs_dash()
-    return qs_dash()
-  ?mode = "def"
-    stance = "melee def"
-  :?mode = "dps"
+  ?come_closer()
+    return true
+  ?eff_dist > 7 // get into range
+    mode = "def"
+  var offhand
+  ?mode = "dps"
     stance = "melee dps"
+    ty = "melee"
+    offhand = "melee"
+  :?mode = "def"
+    stance = "melee def"
+    ty = "melee"
+    offhand = "shield"
+  :?mode = "aoe"
+    stance = "melee aoe"
+    equip @melee_aoe_weapon@
+    return
   :
-    dbg("unsupported mode for " +
-    ^"melee(): " + mode)
-    return false
-  _found = get_1h_weapon("melee")
-  ?!_found
-      dbg("can't find melee weapon for mode=" + 
-      ^mode)
-    _found = "sword"
-  return left_hand(_found) & 
-  ^offhand(mode, "melee")
+    dbg("melee(" + mode + "): unsupported mode="
+    ^+ mode)
+    return
+  ?low_hp
+    stance = stance + " vamp"
+  found = maybe_healing_equipment(ty)
+  ?found
+    main_hand(found)
+  :
+    dbg("melee(" + mode + "): no weapon found")
+  found = maybe_healing_equipment(offhand)
+  ?found
+    equipR @found@
+  :
+    dbg("melee(" + mode + "): no " + 
+    ^ offhand + " found")  
+
+func come_closer()
+  ?should_qs_dash()
+    return qs_dash()
+  :?can_dash()
+    return dash()
+  return false  
 
 func auto_ranged()
   ?use_abilities()
     return true
-  :?foe_dist > 10 & !phys_immune
-    return ranged("single")
-  :?low_hp & foe_dist < 11
-    return melee("def")
-  :?can_aoe
-    return aoe("ranged")
+  :?ranged_aoe_weapon & can_aoe & eff_dist <= 16
+    return elemental_aoe()
+  :?ranged_st_weapon
+    return ranged()
   :
-    return ranged("dps")
+    return auto_melee()
 
-// mode: "dps" | "def" | "single"
-func ranged(mode)
-  ?mode = "def"
-    stance = "ranged def"
-  :?mode = "dps"
-    stance = "ranged dps"
-  :?!(mode = "single")
-    dbg("unsupported mode for ranged(): " +
-    ^mode)
-    return false
-  ?(foe = magic_resist | mode = "single") & 
-  ^best_wpns[t_best_2h_r]
-    stance = "ranged single target"
-    equip @best_wpns[t_best_2h_r]@
+func ranged()
+  stance = "ranged " + ranged_st_weapon
+  ?ranged_st_weapon = "repeating"
+    equip @ranged_st_weapon@
     return
-  _found = get_1h_weapon("ranged")
-  ?!_found
-    ?mode = "dps" & best_wpns[t_best_2h_r]
-      stance = "ranged single target"
-      equip @best_wpns[t_best_2h_r]@
-      return
-    :
-      dbg("can't find ranged wand for mode=" + 
-      ^mode)
-      _found = "wand"
-  return left_hand(_found) & 
-  ^offhand(mode, "ranged")
+  :?ranged_st_weapon = "xbows"
+    ty = "crossbow"
+  :?ranged_st_weapon = "wands"
+    ty = "wand"
+  :
+    dbg("ranged(): unsupported ranged_st_weapon="
+    ^+ ranged_st_weapon)
+    return
+  ?low_hp
+    stance = stance + " vamp"
+  found = maybe_healing_equipment(ty)
+  ?found
+    main_hand(found)
+  :
+    dbg("ranged(" + ranged_st_weapon + 
+    ^"): no weapon found")
+  found = maybe_healing_equipment(ty)
+  ?found
+    equipR @found@
+  :
+    dbg("ranged(" + ranged_st_weapon + 
+    ^"): no offhand found")
 
 func auto_elemental()
   ?use_abilities()
     return true
-  :?foe_dist <= 11 & foe_ehp > 0 & can_backflip()
-    return backflip()
-  :?low_hp
-    return elemental("def")
+  :?ranged_aoe_weapon
+    return elemental_aoe()
   :
-    return elemental("dps")
+    return auto_melee()
 
-// mode: "dps" | "def"
-func elemental(mode)
-  _found = get_1h_weapon("ranged")
-  ?!_found
-    dbg("can't find elemental wand for mode=" + 
-    ^mode)
-    _found = "wand"
-  left_hand(_found)
-  ?mode = "def"
-    stance = "elemental def"
-    return offhand(mode, "shield")
-  :?mode = "dps"
-    stance = "elemental dps"
-    return offhand(mode, "ranged")
+func elemental_aoe()
+  stance = "elemental"
+  ?ranged_aoe_weapon = "wands"
+    ty = "wand"
+  :?ranged_aoe_weapon = "staff"
+    ty = "staff"
   :
-    dbg("unsupported mode for elemental(): " +
-    ^mode)
-    return false
-
-// mode: "melee" | "ranged"
-func aoe(mode)
-  ?mode = "ranged"
-    equip @ranged_2h@
-  :?mode = "melee"
-    ?best_wpns[t_best_2h_m]
-      equip @best_wpns[t_best_2h_m]@
-      return true
-    :
-      return melee("def")
+    dbg("elemental_aoe(): unsupported " + 
+    ^"ranged_aoe_weapon=" + ranged_aoe_weapon)
+    return
+  ?low_hp
+    stance = stance + " vamp"
+  found = maybe_healing_equipment(
+  ^ranged_aoe_weapon)
+  ?found
+    main_hand(found)
   :
-    dbg("unsupported mode for aoe(): " +
-    ^mode)
-    return false
-
-func left_hand(weapon)
-  _used = weapon
-  equipL @weapon@
-  return true
-
-// mode: "dps" | "def"
-// type: "ranged" | "melee" | "shield"
-func offhand(mode, type)
-  ?type ! "ranged" & dash()
-    return true
-  :?mode = "def"
-    shield()
-  :?mode = "dps"
-    _found = get_1h_weapon(type)
-    ?_found
-      equipR @_found@
-    :
-      dbg("can't find offhand for mode=" + 
-      ^mode + ", type=" + type)
-      shield()
+    dbg("elemental_aoe(" + ranged_aoe_weapon +  
+    ^"):no weapon found")
+  ?ty = "staff"
+    return
+  // get second wand
+  found = maybe_healing_equipment(ty)
+  ?found
+    equipR @found@
   :
-    dbg("unsupported mode for " +
-    ^"offhand(): " + mode)
-    return false
-  return true
+    dbg("elemental_aoe(" + ranged_aoe_weapon + 
+    ^"): no offhand found")
 
-func shield()
-  _found = get_1h_weapon("shield")
-  ?_found
-    equipR @_found@
-  :
-    dbg("can't find shield")
-    equipR shield
-  return true
-
-func dash()
-  ?!disable_dash & 
-  ^foe_dist >= 10 & foe_dist <= 16 &
+func can_dash()
+  return can("dash") & !disable_dash & 
+  ^eff_dist > 10 & eff_dist < 17 &
   ^(bashCD <= 0 | dashCD <= 0) &
   ^can_activate()
-    ?ability_wpns[bash_idx] & bashCD <= 0 &
-    ^!disable_bash
-      equipR @bashing@
-      return true
-    :?ability_wpns[dash_idx] & dashCD <= 0
-      equipR @dashing@
-      return true
-  return false
 
-// type: "ranged" | "melee" | "shield"
-func get_1h_weapon(type)
-  ?type = "melee"
-    ?foe.armor > 0
-      type = t_aa
-    :
-      type = t_1h
-  :?type = "ranged"
-    type = t_wand
-  :?type = "shield"
-    type = t_shield
-  :
-    dbg("unsupported type for " +
-    ^"get_1h_weapon(): " + type)
-    return false
-  // maybe heal up
-  ?(aether_foe | low_hp) & 
-  ^available(vigor_wpns[type])
-    return vigor_wpns[type]
-  // then find correct element
-  :?fire_foe & available(aether_wpns[type])
-    return aether_wpns[type]
-  :?ice_foe & available(fire_wpns[type])
-    return fire_wpns[type]
-  :?poison_foe & available(ice_wpns[type])
-    return ice_wpns[type]
-  :?vigor_foe & 
-  ^available(poison_wpns[type])
-    return poison_wpns[type]
-  // then your best weapon
-  :?available(best_wpns[type])
-    return best_wpns[type]
-  // then best offhand
-  :?type < 3 & available(best_wpns[type + 4])
-    return best_wpns[type + 4]
-  // then another best melee type
-  :?type = t_aa
-    ?available(best_wpns[t_1h])
-      return best_wpns[t_1h]
-    :?available(best_wpns[t_1h + 4])
-      return best_wpns[t_1h + 4]
-  :?type = t_1h
-    ?available(best_wpns[t_aa])
-      return best_wpns[t_aa]
-    :?available(best_wpns[t_aa + 4])
-      return best_wpns[t_aa + 4]
-  return false
-
-func available(weapon)
-  return weapon ! false & 
-  ^(!_used | _used ! weapon)
-
-func shield_block(stay_still)
-  stance = "shield block"
-  ?stay_still
-    equipL quest
-  equipR @vigor_shield@
+func dash()
+  ?!disable_bash & have_bashing & bashCD <= 0
+    stance = "bashing"
+    equipR bashing
+  :?dashCD <= 0 & have_dashing
+    stance = "dashing"
+    equipR dashing
+  return true
 
 func must_ranged_foe()
   return foe = mosquito | 
@@ -498,65 +514,65 @@ func must_melee_foe()
   return foe = immune_to_ranged | foe = ranged | 
   ^foe = cult_guard // poisons on being hit
 
-// mode: "dps" | "def" | "auto"
-func melee_boss(mode)
-  ?foe_dist > 16 & can_qs_dash()
-    return qs_dash()
-  ?mode = "auto"
-    ?low_hp
-      mode = "def"
-    :
-      mode = "dps"
+func auto_melee_boss()
+  ?come_closer()
+    return true
+  var mode
+  ?low_hp
+    mode = "def"
+  :
+    mode = "dps"
   ?!use_abilities() // if no abilities are done
     ?!debuff(mode) // and no debuffs are needed
       return melee(mode)
 
 // mode: "dps" | "def"
 func debuff(mode)
-  // note: don't bother debuffing
-  // regular eneimes, it's faster to kill them
   ?foe_buffs = disable_debuff | 
   ^foe_buffs = mirror
     return false
-  _found = false
+  var consider = []
   ?!(foe_debuffs = foe_poisoned) &
   ^!(foe = immune_to_debuff_damage)
-    _found = poison_1h
+    consider.Add("poison")
   :?!(foe_debuffs = foe_on_fire) &
   ^!(foe = immune_to_debuff_dot)
-    _found = fire_1h
+    consider.Add("fire")
   :?!(foe_debuffs = max_chill_s) &
   ^!(foe = immune_to_debuff_chill)
-    _found = ice_1h
-  ?_found
-    stance = "debuffing"
-    left_hand(_found)
-    ?mode = "def"
-      offhand(mode, "shield")
-    :?mode = "dps"
-      offhand(mode, "melee")
-    :
-      dbg("unsupported mode for " +
-      ^"debuff(): " + mode)
-    return true
-  :
+    consider.Add("ice")
+  ?consider.Count() = 0
     return false
-
-func aac(weapon)
-  // attack animation cancelling:
-  // equipping a different weapon
-  // right after the attack cancels
-  // the backswing animation,
-  // effectively increasing your
-  // attack speed
-  ?weapon = heavy_ham
-    // clips itself too much
-    equip @weapon@
+  stance = "debuffing"
+  for i = 0 .. consider.Count() - 1
+    found = get_elem_equipment("melee", 
+    ^consider[i], true)
+    ?found
+      main_hand(found)
+      i = 999
+  ?mask_quest = "5debuffs"
+    equipR mask
     return
-  ?ai.idle & !berserk & !slowed
-    equip wand
-  equip @weapon@
-  return true
+  found = false
+  ?mode = "dps"
+    // try to get debuffing weapon
+    for i = 0 .. consider.Count() - 1
+      found = get_elem_equipment("melee", 
+      ^consider[i], true)
+      ?found
+        equipR @found@
+        return true
+    // otherwise, a regular weapon
+    ?!found
+      found = get_equipment("melee", false)
+      ?found
+        equipR @found@
+        return true
+  found = maybe_healing_equipment("shield")
+  ?found
+    equipR @found@
+    return true
+  return false
 
 /********************
 **    #Abilities   **
@@ -570,21 +586,34 @@ func aac(weapon)
 // <something>() actually uses trues to use
 //   the ability without doing checks itself
 
+func can(ability)
+  return !ability_lock | 
+  ^string.Equals(ability_lock, ability)
+
 // quarterstaff
 func can_qs_dash()
-  return staffCD <= 0 & can_activate()
+  return can("qs") & !disable_dash & 
+  ^staffCD <= 0 & can_activate()
+
+// quarterstaff
+func should_qs_dash()
+  return (prefer_ranged & eff_dist > 28) |
+  ^eff_dist > 16 & can_qs_dash()
 
 // quarterstaff
 func qs_dash()
+  stance = "staff-dashing"
   equip quarterstaff
   ?item.CanActivate("quarterstaff")
     activate R
+  return true
 
 // Mind Stone
 func can_backflip()
   // don't check this condition
   // for boss mechanics (when free_mind is false)
-  return free_mind & mindCD <= 0 &
+  return can("mind") & free_mind & 
+  ^mindCD <= 0 &
    // don't jump into the wall
   ^screen.FromWorldX(pos.x) > 5
   
@@ -592,18 +621,24 @@ func can_backflip()
 func backflip()
   stance = "mind stone R"
   equipL mind
-  shield()
+  found = get_equipment("shield", false)
+  ?found
+    equipR @found@
+  :
+    dbg("backflip(): no shield found")
 
 // skeleton arm
 func can_slap()
-  ?!ability_wpns[arm_idx] | foe_dist > 6 |
-  ^phys_immune | disable_abilities |
-  ^!can_activate()
+  ?!can("arm") | !have_arm | eff_dist > 6 |
+  ^phys_immune
     return false
-  ?pp_amount < max_pickpocket & !slowed & !low_hp
+  ?(pickpocket_quest | maintain_pickpocket) &
+  ^(pickpocket_stacks < max_pickpocket) & 
+  ^!slowed & !low_hp
     return true // get to max buffs
-  return armCD > 0 & !disable_steal &
-  ^pp_amount >= max_pickpocket
+  return have_arm & armCD <= 0 & !disable_steal &
+  ^pickpocket_stacks >= max_pickpocket &
+  ^can_activate()
 
 // skeleton arm
 func should_slap()
@@ -613,36 +648,45 @@ func should_slap()
 // skeleton arm
 func slap()
   stance = "skeleton arm R"
-  aac(arm)
-  ?pp_amount >= max_pickpocket &
+  aac("skeleton arm")
+  ?pickpocket_stacks >= max_pickpocket &
   ^item.CanActivate("skeleton_arm")
     activate R
   return true
 
 // blade of the fallen god
 func can_smite()
-  return ability_wpns[blade_idx] & smiteCD <= 0 &
-  ^!disable_abilities &
-  ^foe ! pallas & // immune?
+  return can("smite") & 
+  ^have_blade & smiteCD <= 0 &
+  ^!disable_smite & 
+  ^eff_dist <= 20 & (foe ! pallas) & // immune
   ^can_activate()
 
 // blade of the fallen god
 func should_smite()
-  return (is_boss | foe.count >= smite_treshold &
-  ^foe_ehp<=edmg(smite_damage)) & can_smite()
+  ?bfg_quest = "variety"
+    ?foe_ehp<=edmg(smite_damage) & can_smite()
+      for e : bfg_defeated_foes
+        ?foe = e
+          return false
+      return true
+    return false
+  :
+    return (is_boss | foe.count >= smite_treshold
+    ^& foe_ehp<=edmg(smite_damage)) & can_smite()
 
 // blade of the fallen god
 func smite()
   stance = "smite R"
-  aac(blade)
+  aac("blade")
   ?item.CanActivate("blade")
     activate R
   return true
 
 // heavy hammer
 func can_hammer()
-  return ability_wpns[ham_idx] & !phys_immune & 
-  ^!disable_abilities & foe_dist <= 7 &
+  return can("hammer") & have_ham & 
+  ^!phys_immune & eff_dist <= 7 &
   ^(hammerCD <= 0 | hammerCD >= 647) &
   ^can_activate()
 
@@ -653,34 +697,57 @@ func should_hammer()
 
 // heavy hammer
 func hammer()
+  ability_lock = "hammer"
   stance = "heavy hammer R"
-  aac(heavy_ham)
+  aac("heavy hammer")
   ?item.CanActivate("hammer")
     activate R
   return true
 
 // bardiche
 func can_bard()
-  return ability_wpns[bard_idx] & foe_dist <= 9 &
+  return can("bardiche") & have_bard & 
+  ^eff_dist <= 9 & !phys_immune &
   ^(bardCD <= 0 | bardCD >= 870) &
-  ^!disable_abilities & !phys_immune &
   ^can_activate()
 
 // bardiche
 func should_bard()
-  return is_boss & can_bard()
+  return can_bard()
 
 // bardiche
 func bardiche()
+  ability_lock = "bardiche"
   stance = "bardiche R"
-  aac(bard)
+  aac("bardiche")
   ?item.CanActivate("bardiche")
     activate R
   return true
 
+// mask
+func can_mask()
+  return can("mask") & have_mask & 
+  ^maskCD <= 0 & can_activate()
+
+// mask
+func should_mask()
+  return is_boss & can_mask()
+
+// mask
+func mask()
+  stance = "mask R"
+  equipR mask
+  ?item.CanActivate("mask")
+    activate R
+  return true
+
 func use_abilities()
-  ?disable_abilities
-    return false
+  // prioritize quests
+  ?mask_quest = "simple" & can_mask()
+    return mask()
+  ?pickpocket_quest & can_slap()
+    return slap()
+  // then use where needed
   ?should_hammer()
     return hammer()
   ?should_smite()
@@ -694,27 +761,75 @@ func use_abilities()
 func can_activate()
   return ai.enabled & item.CanActivate()
 
+func aac(weapon)
+  // attack animation cancelling:
+  // equipping a different weapon
+  // right after the attack cancels
+  // the backswing animation,
+  // effectively increasing your
+  // attack speed
+  equip @weapon@
+  ?!berserk & !slowed & ai.idle
+    // sometimes dashing/bashing seem to have
+    // weird behavior: after dash/bash ai.idle
+    // will not become false even after using
+    // other abilities. it interrupts hammer R,
+    // bardiche R, and some weapon attacks
+    // i have no idea what really causes it,
+    // but at least don't interrupt R's
+    ?string.Equals(weapon, "heavy hammer") &
+    ^hammer_swing
+      return false
+    :?string.Equals(weapon, "bardiche") &
+    ^bardiche_swing
+      return false
+    equip wand
+  equip @weapon@
+  return true
+
 /*****************
 **    #Bosses   **
 *****************/
 
+func lock_abilities(source)
+  // doesn't interrupt the ability that's
+  // already in progres, but prevents
+  // new ones from starting
+  ?!ability_lock
+    ability_lock = source
+
+func shield_block()
+  stance = "shield block"
+  equipR @evade_shield@
+
+func shield_block_and_halt()
+  stance = "shield block and halt"
+  equipL quest
+  equipR @evade_shield@
+
+func fight_scout()
+  ?mask_quest = "prevent"
+    equipL quest
+    equipR mask
+
+  :
+    dbg("TODO")
+
 func fight_dysan()
   ?foe = phase1
     disable_steal = true
-    ?foe.state = 33 & 
-    ^foe.time > 23 & foe.time < 26
-      // evade big attack
-      return melee("def")
-    melee_boss("auto")
+    ?foe.state = 33 & foe.time = 24
+      // block big attack
+      shield_block()
+    auto_melee_boss()
   :?foe = phase2
     // just match elements
     disable_steal = true
-    melee_boss("auto")
+    auto_melee_boss()
   :?foe = phase3
-    ?foe.state = 32 & foe.time > 90 |
-    ^foe.state = 33 & foe.time < 2
+    ?foe.state = 32 & foe.time > 90
       // prepare for attack
-      return melee("def")
+      shield_block()
     :?foe.state = 115
       ?foe.time = 60
         // dodge the orb ray
@@ -724,70 +839,112 @@ func fight_dysan()
         disable_dash = true
     :?foe.state = 106 | foe.state = 108 |
     ^foe.state = 0
-      // transitions
-      disable_abilities = true
+      shield_block()
     :?foe.state = 107 | foe.state = 32
       disable_steal = true
-    melee_boss("dps")
+    auto_melee_boss()
 
 func fight_xyloalgia()
   ?foe = phase1
     // Xyloalgia
-    return melee_boss("auto")
+    return auto_melee_boss()
   // Poena
   disable_steal = true
-  ?foe.state = 32 & foe.time > 40
-    shield_block(false)
-  :?foe_buffs = mirror
-    // try to avoid debuffing yourself
-    disable_bash = true
-    ?use_abilities()
-      return
-    ?vigor_wpns[t_1h]
-      left_hand(vigor_wpns[t_1h])
-      shield()
-    :?aether_wpns[t_1h]
-      left_hand(aether_wpns[t_1h])
-      shield()
-    :?best_wpns[t_1h]
-      left_hand(best_wpns[t_1h])
-      shield()
-    :
-      melee("def")
+  ?foe_buffs = mirror
+    shield_block_and_halt()
+  :?foe.state = 32 & foe.time = 41
+    shield_block()
   :
-    melee_boss("auto")
+    auto_melee_boss()
 
 func fight_bolesh()
+  // Get close, debuff/use abilities, then
+  // jump to ranged before the first melee bite,
+  // and continue shooting and blocking.
   ?loc.stars > 5
     disable_steal = true
   ?foe.state = 133 &
   ^(foe.time > 12 & foe.time < 18)
-    // try to evade bites
-    shield_block(true)
-  // :?(bardCD <= 0 | bardCD >= 870) &
-  :?(foe_buffs ! "spider_buff_damage") &
-  ^mindCD <= 0
-    melee_boss("auto")
+    // block bite and don't move from ranged
+    shield_block_and_halt()
+  :?foe.state = 142 & foe.time > 53
+    // evade melee bite
+    backflip()
+  :?bfg_quest = "bolesh" & 
+  ^(foe_ehp < edmg(smite_damage))
+    ?come_closer()
+      return true
+    :
+      equip @blade@
+  :?mindCD <= 0 &
+  ^foe_buffs ! "spider_buff_damage" & 
+  ^(use_abilities() | debuff("dps"))
+    auto_melee_boss()
   :?mindCD <= 0 & foe_dist < 10
     backflip()
   :
-    ranged("single")
+    ranged()
 
-func fight_mushroom()
-  ?loc.stars > 5 & foe = phase1
-    disable_steal = true
-  melee_boss("auto")
+func try_evade()
+  ?mindCD <= 0
+    return backflip()
+  return shield_block()
+
+func fight_mushrooms()
+  disable_steal = true
+  ?ability_lock = "shrooms"
+    ability_lock = false
+  ?foe = phase1
+    ?foe.state = 32 & foe.time = 48
+      // only the first swing is accurate,
+      // then its timing is affected by chill
+      return try_evade()
+    :?foe.state = 32 & foe.time > (48 - 15)
+      // prevent interrupts
+      lock_abilities("shrooms")
+    :?foe.state = 33
+      // V = 1 frame / sec
+      ?foe.time = foe_dist + 4
+        // pellets
+        return shield_block()
+      :
+        // prevent interrupts
+        lock_abilities("shrooms")
+  :?foe = mushroom_boss_fat
+    ?loc.stars < 11
+      big_swing = 56
+    :
+      big_swing = 59
+    ?foe.state = 32
+      ?foe.time = big_swing
+        // only accurate for the first punch
+        // then it's affected by chill/stun
+        return try_evade()
+      :?foe.time > (big_swing - 15)
+        // prevent interrupts
+        lock_abilities("shrooms")
+    :
+      auto_melee_boss()
+    // TODO detect pellets
+  : // Enoki themself
+    ?eff_dist > 6
+      ?!come_closer()
+        melee("def")
+    :
+      auto_melee_boss()
+    // TODO detect pellets
+  auto_melee_boss()
 
 func fight_pallas()
   at_boss = true
   disable_steal = true
-  ?foe.count > 4
+  ?foe.count > 2
     ?foe_dist < 15 & mindCD <= 0
       backflip()
     :
-      elemental("dps")
+      elemental_aoe()
   :
-    melee_boss("auto")
+    auto_melee_boss()
 
 func fight_bronze_guardian()
   disable_steal = true
@@ -798,7 +955,7 @@ func fight_bronze_guardian()
     ?!use_abilities()
       melee("dps") // don't bother debuffing
   :?foe_dist > 15 & foe.state = 2
-    ranged("single")
+    ranged()
 
 func fight_hrimnir()
   at_boss = true
@@ -819,34 +976,31 @@ func fight_hrimnir()
       // on higher stars he blows you away
       // immediately
       equip shovel
-    : // blown away
-      ?slowed
-        ranged("single")
-      :
-        auto_melee()
+    : // blown away, get back
+      auto_melee()
   :?foe.state = 143 | foe.state = 144 // blowing
-    ranged("single")
+    ranged()
   :?foe.count > 1 // deal with adds
     ?slowed // don't waste time on movement
-      ?foe_dist < 7
+      ?range < 7
         auto_melee()
       :?foe.count > 2
-        aoe("ranged")
+        elemental_aoe()
       :
-        ranged("single")
+        ranged()
     :?can_smite()
       smite()
     :?can_bard() & foe = ice_wall
       bardiche()
     :?foe.count > 2 // elementals
-      aoe("melee")
+      melee("aoe")
     :
       auto_melee() // ice wall
   :?slowed
     // don't waste time on movement
-    ranged("single")
+    ranged()
   :
-    melee_boss("auto")
+    auto_melee_boss()
 
 func fight_nagajara()
   disable_steal = true
@@ -860,17 +1014,17 @@ func fight_nagajara()
 
   ?naga_step = 0
     // start at the xbow range
-    ranged("single")
+    ranged()
   :?naga_step = 1
     // staff 1st poison
     qs_dash()
     naga_step++
   :?naga_step = 2
     // and continue to shoot
-    ranged("single")
+    ranged()
   :?naga_step = 3
     // dash into melee
-    melee_boss("dps")
+    auto_melee_boss()
   :?naga_step >= 4
     ?mindCD <= 0
       // dodge back and repeat
@@ -878,7 +1032,7 @@ func fight_nagajara()
       naga_step = 0
     :
       // mind stone on CD, try to def
-      melee_boss("def")
+      melee("def")
 
 func is_poison_near(pos_x, pos_y)
   // long and mid range
@@ -888,13 +1042,15 @@ func is_poison_near(pos_x, pos_y)
     return true
   return false
 
-func _detect_poison(pos_x, pos_y)
+func _detect_poison()
+  var x = screen.FromWorldX(pos.x)
+  var y = screen.FromWorldZ(pos.z)
   >`0,0,x=@x@, y=@y@
   for px = pos_x .. pos_x+10
     for py = pos_y-6 .. pos_y
       ?draw.GetSymbol(px, py) = "("
         cache.Add([pos_x, pos_y, px, py])
-  arr_size = cache.Count()
+  var arr_size = cache.Count()
   ?arr_size > 0
     for line = 1 .. arr_size
       var v = cache[line-1]
@@ -923,28 +1079,30 @@ var ignore_st = [ // irrelevant statuses
   "bardiche_buff_move_speed",
 ]
 var statuses = [
-^["smite", "Smite", "+"], 
-^["pick_pocket", "Pickpocket", "+"],
-^["vampiric", "Vamp", "+"],
-^["lucky_crit_multi", "Lucky", "+"],
-^["debuff_damage", "DmgDown", "-"],
-^["debuff_duration_damage", "DmgDown", "-"],
-^["spider_debuff_damage", "DmgDown", "-"],
-^["dysangelos_debuff_damage", "DmgDown", "-"],
-^["debuff_yeti_chill", "AtkSlow", "-"],
-^["debuff_attack_speed", "AtkSlow", "-"],
-^["debuff_move_speed", "MoveSlow", "-"],
-^["debuff_chill", "Chill", "-"],
-^["stun", "Stun", "-"],
-^["pallas_phase2_debuff", "RangeDown", "-"],
-^["debuff_dot", "FireDoT", "-"],
+  ["smite", "Smite", "+"], 
+  ["pick_pocket", "Pickpocket", "+"],
+  ["vampiric", "Vamp", "+"],
+  ["lucky_crit_multi", "Lucky", "+"],
+  ["invisibility", "Invis", "+"],
+  ["debuff_damage", "DmgDown", "-"],
+  ["debuff_duration_damage", "DmgDown", "-"],
+  ["spider_debuff_damage", "DmgDown", "-"],
+  ["dysangelos_debuff_damage", "DmgDown", "-"],
+  ["puff_debuff_damage", "DmgDown", "-"],
+  ["debuff_yeti_chill", "AtkSlow", "-"],
+  ["debuff_attack_speed", "AtkSlow", "-"],
+  ["debuff_move_speed", "MoveSlow", "-"],
+  ["debuff_chill", "Chill", "-"],
+  ["stun", "Stun", "-"],
+  ["pallas_phase2_debuff", "RangeDown", "-"],
+  ["debuff_dot", "FireDoT", "-"],
 ]
 var dmg_debuffs = [
-^"debuff_damage", "debuff_duration_damage",
-^"spider_debuff_damage",
+  "debuff_damage", "debuff_duration_damage",
+  "spider_debuff_damage", "puff_debuff_damage"
 ]
 var slow_debuffs = [
-^"debuff_chill", "debuff_move_speed"
+  "debuff_chill", "debuff_move_speed"
 ]
 var stun_debuff = "stun"
 var max_chill_s = "❄:debuff_chill:" + 
@@ -959,33 +1117,40 @@ var pickpocket_buff = "pick_pocket"
 // misc
 var at_boss = false // to deal with adds
 var naga_step = 0 // nagaraja fight
+var big_swing = 0 // mushrooms
 // player status
 var stance = "unknown" // chosen combat stance
-var low_hp = 0 // hp < (maxhp / 2)
-var dmg_down = 0 //total dmg debuff (poison, etc) 
+var low_hp = false // hp < (maxhp * threshold)
+var dmg_down_stacks = 0 // poison
+var range_down_stacks = 0
+var pickpocket_stacks = 0 // pickpocket buff
 var slowed = false // is player slowed
 var stunned = false // is player stunned
 var berserk = false // berserk potion TODO
 var can_aoe = false // foe.count >= aoe_treshold
-var pp_amount = 0 // pickpocket buff amount
 // abilities
-var free_mind = false // can use mindstone freely
-var disable_abilities = false // for some bosses
-var disable_steal = false // for some bosses
-var disable_dash = false // for some bosses
-var disable_bash = false // for poena
+var ability_lock = false // prevent interruption
+var free_mind = false
+var disable_steal = false
+var disable_dash = false
+var disable_bash = false
+var disable_smite = false
 // foe status
 var foe_ehp = 0 // foe.armor + foe.hp
-var phys_immune = false // immune to physical
+var foe_dist = 0 // foe_dist
+var eff_dist = 0 // foe_dist + range_debuff
 var foe_buffs = "" // foe.buffs.string
 var foe_debuffs = "" // foe.debuffs.string
-var foe_dist = 0 // foe.distance
-var aether_foe = false // foe = aether
-var fire_foe = false // foe = fire
-var ice_foe = false // foe = ice
-var poison_foe = false // foe = poison
-var vigor_foe = false // foe = vigor
 var is_boss = false // foe = boss
+var phys_immune = false // immune to physical
+// hit tracking
+var enable_hit_tracking = false
+var last_frame_dist = 0
+var last_frame_armor = 0
+var last_frame_hp = 0
+var last_frame_foe = ""
+var last_frame_dist = 0
+var last_frame_state = -1
 // cooldowns
 var mindCD = 0
 var staffCD = 0
@@ -996,78 +1161,236 @@ var hammerCD = 0
 var smiteCD = 0
 var bardCD = 0
 var maskCD = 0
+var bardiche_swing = 0
+var hammer_swing = 0
 
 // Pre-define vars for internal functions.
-// no idea if it matters for performance,
-// but why not.
-// Except weapon switching: it breaks
-// spectacularly if you reuse the same global
-// var for multiple values in a single frame.
-var _used = false
-var _found = false
-// status handling
-var splt = [] // splitted buff/debuff string
-var st_uid = ""
-var st_amount = 0
-var st_info = []
-var st_dur = 0
-var st_s = ""
+var found = false
+var ty = false
+var _main_hand = false
+var _elems = []
 var st_good = [] // current buffs
 var st_bad = [] // current debuffs
 var st_x = [] // unknown status effects
 var status_uids = []
-var arr_size = 0
-var idx = 0
 var errors = []
 var cache = []
+
+var have_bard = 
+^special_items.IndexOf("bardiche") ! -1
+var have_ham = 
+^special_items.IndexOf("heavy hammer") ! -1
+var have_dashing = 
+^special_items.IndexOf("dashing") ! -1
+var have_bashing = 
+^lost_items.IndexOf("bashing") ! -1
+var have_arm = 
+^lost_items.IndexOf("arm") ! -1
+var have_blade = 
+^lost_items.IndexOf("blade") ! -1
+var have_mask = 
+^lost_items.IndexOf("mask") ! -1
+
+var type_offsets = [
+  "sword", "big sword", "wand",
+  "shield", "crossbow", "staff", 
+  "warhammer",
+  ]
+var elem_offsets = [
+  "aether", "fire", "ice", "poison", "vigor",
+  "default",
+  ]
+var equipment = [
+  // Each element of this array is
+  // [[damage/armor items], [debuff items]]
+  // they're placed by equip offset, then by
+  // elem offset.
+  // For example: first element is aether swords, 
+  // seconds is fire swords, sixth is aether 
+  // big swords.
+  // See also: get_item()
+]
+// "{element} {type} {suffix + enchant}"
+var name_template = "{0} {1} {2}"
+func _fill_items_cache()
+  // add placeholders for every type+element pair
+  for i = 0 .. (type_offsets.Count() * 
+    ^elem_offsets.Count())
+    equipment.Add([[], []])
+   // `it` is 
+   // ["type": ["elem", "s1", "sn"], [elem2...]]
+  for it : elemental_items
+    ?it.Count() > 1
+      for i = 1 .. it.Count() - 1
+        //`el_it` is ["elem", "s1", "sn"]
+        var el_it = it[i]
+        ?el_it.Count() < 2
+          i++ // continue
+        ty = it[0] // item type
+        var elem = el_it[0] // item element
+        var offset = type_offsets.IndexOf(ty) *
+        ^ 5 + elem_offsets.IndexOf(elem)
+        // for every suffix in list
+        for j = 1 .. el_it.Count() - 1
+          var suffix = el_it[j]
+          // `slot` is 
+          // [[dmg items], [debuff items]]
+          var slot = equipment[offset]
+          var full_name
+          ?elem = "default"
+            full_name = suffix
+            ?slot[0].IndexOf(full_name) = -1
+              slot[0].Add(full_name)
+          :
+            full_name = string.Format(
+            ^name_template, elem, ty, suffix)
+            ?is_debuff(suffix) & 
+              ^slot[1].IndexOf(full_name) = -1
+              slot[1].Add(full_name)
+            :?slot[0].IndexOf(full_name) = -1
+              slot[0].Add(full_name)
+
+var debuff_suffixes = "fFiIpPhL"
+func is_debuff(suffix)
+  ?string.Size(suffix) < 2
+    return false
+  // check second symbol of the suffix
+  return string.IndexOf(debuff_suffixes,
+  ^string.Sub(suffix, 1, 1)) ! -1
+
+// ty: "melee" | "wand" | "crossbow" | "shield"
+// debuff: bool
+func get_equipment(ty, debuff)
+  // first try the preferred element
+  found = get_elem_equipment(ty, _elems[0],
+  ^debuff)
+  ?found
+    return found
+  // they try the default
+  found = get_item(ty, "default", debuff)
+  ?found
+    return found
+  // they try the rest of the elements
+  for i = 1 .. _elems.Count() - 1
+    var elem = _elems[i]
+    found = get_elem_equipment(ty, elem, debuff)
+    ?found
+      return found
+  return false
+
+var melee_1h_weapons = [
+  "sword", "big sword", "warhammer"
+]
+var melee_aa_weapons = [
+  "warhammer", "sword", "big sword"
+]
+func get_elem_equipment(ty, elem, debuff)
+  found = false
+  var arr
+  ?ty = "melee"
+    ?foe.armor > 0
+      arr = melee_aa_weapons
+    :
+      arr = melee_1h_weapons
+    for ty : melee_1h_weapons
+      found = get_item(ty, elem, debuff)
+      ?found
+        return found
+  :?ty = "wand"
+    return get_item("wand", elem, debuff)
+  :?ty = "crossbow"
+    return get_item("crossbow", elem, debuff)
+  :?ty = "shield"
+    return get_item("shield", elem, debuff)
+  :?ty = "staff"
+    return get_item("staff", elem, debuff)
+  :
+    dbg("get_elem_equipment(): unsupported type="
+    ^+ ty)
+  return false
+
+// ty: "melee" | "wand" | "crossbow" | shield
+// debuff: bool
+func maybe_healing_equipment(ty)
+  found = false
+  ?low_hp
+    found = get_elem_equipment(ty, "vigor", true)
+  ?!found
+    found = get_equipment(ty, false)
+  return found
+
+// ty: wand, sword, etc
+// element: aether, fire, etc
+// debuff: bool (true/false)
+func get_item(ty, element, debuff)
+  var offset = type_offsets.IndexOf(ty) * 5 + 
+  ^elem_offsets.IndexOf(element)
+  var slot = equipment[offset]
+  ?!debuff
+    found = _find_first(slot[0], _main_hand)
+    // if D item not found, try to find dX item
+  ?debuff | !found
+    found = _find_first(slot[1], _main_hand)
+  return found
+
+func _find_first(arr, exclude)
+  ?arr.Count() > 0
+    for it : arr
+      ?!exclude | !string.Equals(exclude, it)
+        return it
+  return false  
+
+func main_hand(it)
+  equipL @it@
+  _main_hand = it
 
 func _fill_status_uids()
   for st_info : statuses
     status_uids.Add(st_info[0])
 
-func some(s)
-  // true if string is not empty
-  return ! string.Equals(s, "")
-
 func edmg(dmg)
   // effective damage after considering debuffs
-  return dmg - dmg_down
+  return dmg - dmg_down_stacks
 
 func parse_statuses()
   st_good.Clear()
   st_bad.Clear()
-  dmg_down = 0
-  pp_amount = 0
+  dmg_down_stacks = 0
+  range_down_stacks = 0
+  pickpocket_stacks = 0
   slowed = false
   berserk = false
   stunned = false
   for s : [buffs.string, debuffs.string]
     // format: *:name:count:duration,...
-    splt = string.Split(s, ":", ",", false)
-    arr_size = splt.Count()
+    var splt = string.Split(s, ":", ",", false)
+    var arr_size = splt.Count()
     ?arr_size > 0
       // iterate over names (2nd field)
       for i = 1 .. arr_size - 3
-        st_uid = splt[i]
-        st_amount = int.Parse(splt[i+1])
+        var st_uid = splt[i]
+        var st_amount = int.Parse(splt[i+1])
 
         // flags for combat logic
         ?dmg_debuffs.IndexOf(st_uid) ! -1
-          dmg_down = dmg_down + st_amount
+          dmg_down_stacks = dmg_down_stacks + 
+          ^st_amount
+        :?string.Equals(st_uid, range_debuff)
+          range_down_stacks = st_amount
         :?slow_debuffs.IndexOf(st_uid) ! -1
           slowed = true
-        :?st_uid = stun_debuff
+        :?string.Equals(st_uid, stun_debuff)
           stunned = true
-        :?st_uid = pickpocket_buff
-          pp_amount = st_amount
+        :?string.Equals(st_uid, pickpocket_buff)
+          pickpocket_stacks = st_amount
 
-        idx = status_uids.IndexOf(st_uid)
+        var idx = status_uids.IndexOf(st_uid)
         ?idx ! -1
-          st_info = statuses[idx]
-          st_dur = int.Parse(splt[i+2])
+          var st_info = statuses[idx]
+          var st_dur = int.Parse(splt[i+2])
 
-          st_s = string.Format("{0}({1}) {2}",
-          ^st_info[1], st_amount,
+          var st_s = string.Format("{0}({1}) " + 
+          ^"{2}", st_info[1], st_amount,
           ^time.FormatDigital(st_dur))
 
           ?st_info[2] = "+"
@@ -1082,34 +1405,35 @@ func parse_statuses()
 
         i = i + 3
 
+func track_hits()
+  var hp_diff = last_frame_hp - hp
+  ?hp_diff > 0
+    >`15,2,#red,Got hit!
+    >`15,3,Last frame info:
+    >`15,4,last_frame_hp=@last_frame_hp@ (diff=
+    ^@hp_diff@), 
+    ^last_frame_armor=@last_frame_armor@
+    >`15,5,id=@last_frame_foe@
+    >`15,6,dist=@last_frame_dist@
+    >`15,7,state=@last_frame_state@
+  last_frame_armor = armor
+  last_frame_hp = hp
+  last_frame_foe = foe.id
+  last_frame_dist = foe_dist
+  last_frame_state = foe.state
+
 func prelude()
   parse_statuses()
+
+  ?enable_hit_tracking
+    track_hits()
 
   // reset/update dynamic global vars
   disable_steal = false
   disable_dash = false
   disable_bash = false
+  disable_smite = false
   free_mind = false
-  ?stunned
-    disable_abilities = true
-  :
-    disable_abilities = false
-  _used = false
-  stance = "unknown"
-  low_hp = hp < (maxhp / 2)
-  foe_ehp = foe.armor + foe.hp
-  foe_dist = foe.distance
-  foe_buffs = foe.buffs.string
-  foe_debuffs = foe.debuffs.string
-  is_boss = (foe = boss)
-  phys_immune = (foe = immune_to_physical)
-  can_aoe = (foe.count >= aoe_treshold)
-
-  aether_foe = (foe = aether)
-  fire_foe = (foe = fire)
-  ice_foe = (foe = ice)
-  poison_foe = (foe = poison)
-  vigor_foe = (foe = vigor)
 
   mindCD = item.GetCooldown("mind")
   staffCD = item.GetCooldown("quarterstaff")
@@ -1121,44 +1445,113 @@ func prelude()
   bardCD = item.GetCooldown("bardiche")
   maskCD = item.GetCooldown("mask")
 
+  hammer_swing = hammerCD >= 647
+  bardiche_swing = bardCD >= 870
+
+  ?stunned
+    ability_lock = "stun"
+  :?ability_lock
+    // clear the locks after they're done
+    ?(ability_lock = "stun") |
+
+    ^(ability_lock = "bardiche" & 
+    ^!bardiche_swing) |
+
+    ^(ability_lock = "hammer" &
+    ^!hammer_swing)
+      ability_lock = false
+  
+  _main_hand = false
+  stance = "unknown"
+  low_hp = hp < (maxhp * low_hp_threshold)
+  foe_ehp = foe.armor + foe.hp
+  foe_dist = foe.distance  
+  eff_dist = foe_dist + range_down_stacks
+  foe_buffs = foe.buffs.string
+  foe_debuffs = foe.debuffs.string
+  is_boss = (foe = boss)
+  phys_immune = (foe = immune_to_physical)
+  can_aoe = (foe.count >= aoe_treshold) & !low_hp
+
+  ?loc = halls | foe = aether
+    _elems = ["vigor", "fire", "ice", "poison"]
+  :?loc = mine | foe = fire
+    _elems = ["aether", "ice", "poison", "vigor"]
+  :?loc = ridge | foe = ice
+    _elems = ["fire", "aether", 
+    "poison", "vigor"]
+  :?loc = caves | loc = temple | foe = poison
+    _elems = ["ice", "aether", "fire", "vigor"]
+  :?loc = mushroom | foe = vigor
+    _elems = ["poison", "aether", "fire", "ice"]
+  :
+    _elems = ["default", "vigor", "aether", 
+    "fire", "ice", "poison"]
+
 func dbg(e)
   ?ui_show_debug
     ?errors.IndexOf(e) = -1
       errors.Add(e)
 
 func draw_ui()
+  var sy = 22
+  ?ui_show_debug
+    sy = 20
   ?ui_show_statuses
-    >`1,22,#00A300,+ @string.Join(", ", st_good)@
-    >`1,23,#FE6800,- @string.Join(", ", st_bad)@
-    >`1,24,#F008B2,? @string.Join(", ", st_x)@
+    >`1,@sy@,#00A300,
+    ^+ @string.Join(", ", st_good)@
+    >`1,@sy+1@,#FE6800,
+    ^- @string.Join(", ", st_bad)@
+    >`1,@sy+2@,#F008B2,
+    ^? @string.Join(", ", st_x)@
 
   ?ui_show_cd
     var cd_ui_y = 6
-    >`1,@cd_ui_y@,#@colorize(mindCD)@,Mind 
-    ^@time.FormatDigital(mindCD)@
-    ?have_hammer
+    >`1,@cd_ui_y@,#@colorize(mindCD, true)@,
+    ^Mind @time.FormatDigital(mindCD)@
+    ?have_ham
       cd_ui_y++
-      >`1,@cd_ui_y@,#@colorize(hammerCD)@,
+      >`1,@cd_ui_y@,#@colorize(hammerCD, true)@,
       ^Hammer @time.FormatDigital(hammerCD)@
     ?have_bard
       cd_ui_y++
-      >`1,@cd_ui_y@,#@colorize(bardCD)@,
+      >`1,@cd_ui_y@,#@colorize(bardCD, true)@,
       ^Bard @time.FormatDigital(bardCD)@
     ?have_blade
       cd_ui_y++
-      >`1,@cd_ui_y@,#@colorize(smiteCD)@,
+      >`1,@cd_ui_y@,#@colorize(smiteCD, true)@,
       ^Blade @time.FormatDigital(smiteCD)@
     ?have_arm
       cd_ui_y++
-      >`1,@cd_ui_y@,#@colorize(armCD)@,
+      >`1,@cd_ui_y@,#@colorize(armCD, true)@,
       ^Arm @time.FormatDigital(armCD)@
     ?have_mask
       cd_ui_y++
-      >`1,@cd_ui_y@,#@colorize(maskCD)@,
+      >`1,@cd_ui_y@,#@colorize(maskCD, true)@,
       ^Mask @time.FormatDigital(maskCD)@
 
   ?ui_show_debug
-    >`1,21,#blue,Stance: @stance@
+    cd_ui_y++
+    var cd_ui_x = 1
+    >`@cd_ui_x@,@cd_ui_y@,#@colorize(staffCD, 
+    ^can_qs_dash())@,QS
+    cd_ui_x = cd_ui_x + 2
+    ?have_bashing
+      >`@cd_ui_x@,@cd_ui_y@,#7A8F93,/
+      cd_ui_x++
+      >`@cd_ui_x@,@cd_ui_y@,#@colorize(bashCD,
+      ^(!disable_bash & can_dash()))@,B
+      cd_ui_x++
+    ?have_dashing
+      >`@cd_ui_x@,@cd_ui_y@,#7A8F93,/
+      cd_ui_x++
+      >`@cd_ui_x@,@cd_ui_y@,#@colorize(dashCD,
+      ^can_dash())@,D
+
+    >`1,23,#blue,Lock=@ability_lock@,ai.idle=
+    ^@ai.idle@,dashCD=@dashCD@,bashCD=@bashCD@
+
+    >`1,24,#blue,Stance: @stance@
     ?foe
       >`1,13,#7A8F93,+ @foe_buffs@
       >`1,14,#7A8F93,id: @foe.id@
@@ -1166,249 +1559,63 @@ func draw_ui()
       >`1,16,#7A8F93,Time: @foe.time@
       >`1,17,#7A8F93,Dist: @foe_dist@
       >`1,18,#7A8F93,Count: @foe.count@
-      >`1,25,#7A8F93,@foe@
+    >`1,25,#7A8F93,@loc.stars@* 
+    ^@time.FormatDigital(totaltime)@ @foe@
+
     var ey = 2
     for err : errors
       >`15,@ey@,#red,@err@
       ey++
 
-func colorize(cd)
-  ?cd > 0 | disable_abilities
+func colorize(cd, allowed)
+  ?cd > 0
     return "red"
-  return "green" // ready
+  ?!allowed
+    return "FE6800"
+  return "green"
 
 func brew_pot()
   brew tar + bronze // vampiric
 
 func reset_loop()
+  ability_lock = false
   at_boss = false
   naga_step = 0
   cache.Clear()
   st_x.Clear()
 
-/********************
-**   #WeaponCache  **
-********************/
-
-// I want to support cases where you don't
-// have particular weapons, and do it efficiently
-// and ergonomically.
-// Unfortunately, StoneScript is quite limited,
-// and without hashmaps and ternary operators
-// we have a lot of boilerplate :(
-// warning: scary stuff below
-
-// cache weapon info, it never changes mid-zone.
-// to do this, we package caching logic into
-// functions and call them once, on `loc.begin`
-
-// arrays with weapons, arranged in
-// particular order (see various `idx`).
-// this looks very gnarly, but with these arrays
-// we can easily check the weapon existence and
-// equip it (or use an ability):
-// ?aether_wpns[t_1h]
-//   equipL @aether_wpns[t_1h]@
-
-// items with active abilities
-var ability_wpns = []
-var ham_idx = 0
-var bard_idx = 1
-var dash_idx = 2
-var bash_idx = 3
-var arm_idx = 4
-var blade_idx = 5
-func _cache_ability_weapons()
-  ?some(heavy_ham)
-    ability_wpns.Add(heavy_ham)
-  :
-    ability_wpns.Add(false)
-  ?some(bard)
-    ability_wpns.Add(bard)
-  :
-    ability_wpns.Add(false)
-  ?some(dashing)
-    ability_wpns.Add(dashing)
-  :
-    ability_wpns.Add(false)
-  ?some(bashing)
-    ability_wpns.Add(bashing)
-  :
-    ability_wpns.Add(false)
-  ?some(arm)
-    ability_wpns.Add(arm)
-  :
-    ability_wpns.Add(false)
-  ?some(blade)
-    ability_wpns.Add(blade)
-  :
-    ability_wpns.Add(false)
-  ?some(mask)
-    ability_wpns.Add(mask)
-  :
-    ability_wpns.Add(false)
-// best weapons and shields.
-// indexes 0-3 match elemental weapon
-// indexes to simplify weapon selection:
-// offhand for the type is type + 4
-var best_wpns = []
-var t_best_1h_off = 4
-var t_best_aa_off = 5
-var t_best_wand_off = 6
-var t_best_2h_m = 7 // melee 2-hander
-var t_best_2h_r = 8 // ranged 2-hander
-func _cache_best_weapons()
-  ?some(best_1h)
-    best_wpns.Add(best_1h)
-  :
-    best_wpns.Add(false)
-  ?some(best_aa)
-    best_wpns.Add(best_aa)
-  :
-    best_wpns.Add(false)
-  ?some(best_wand)
-    best_wpns.Add(best_wand)
-  :
-    best_wpns.Add(false)
-  ?some(best_shield)
-    best_wpns.Add(best_shield)
-  :
-    best_wpns.Add(false)
-  ?some(best_1h_offhand)
-    best_wpns.Add(best_1h_offhand)
-  :
-    best_wpns.Add(false)
-  ?some(best_aa_offhand)
-    best_wpns.Add(best_aa_offhand)
-  :
-    best_wpns.Add(false)
-  ?some(best_wand_offhand)
-    best_wpns.Add(best_wand_offhand)
-  :
-    best_wpns.Add(false)
-  ?some(melee_aoe)
-    best_wpns.Add(melee_aoe)
-  :
-    best_wpns.Add(false)
-  ?some(ranged_2h)
-    best_wpns.Add(ranged_2h)
-  :
-    best_wpns.Add(false)
-// elemental weapons and shields
-var aether_wpns = []
-var fire_wpns = []
-var ice_wpns = []
-var poison_wpns = []
-var vigor_wpns = []
-var t_1h = 0 // 1-hander
-var t_aa = 1 // anti-armor
-var t_wand = 2
-var t_shield = 3
-func _cache_aether_weapons()
-  ?some(aether_1h)
-    aether_wpns.Add(aether_1h)
-  :
-    aether_wpns.Add(false)
-  ?some(aether_aa)
-    aether_wpns.Add(aether_aa)
-  :
-    aether_wpns.Add(false)
-  ?some(aether_wand)
-    aether_wpns.Add(aether_wand)
-  :
-    aether_wpns.Add(false)
-  ?some(aether_shield)
-    aether_wpns.Add(aether_shield)
-  :
-    aether_wpns.Add(false)
-func _cache_fire_weapons()
-  ?some(fire_1h)
-    fire_wpns.Add(fire_1h)
-  :
-    fire_wpns.Add(false)
-  ?some(fire_aa)
-    fire_wpns.Add(fire_aa)
-  :
-    fire_wpns.Add(false)
-  ?some(fire_wand)
-    fire_wpns.Add(fire_wand)
-  :
-    fire_wpns.Add(false)
-  ?some(fire_shield)
-    fire_wpns.Add(fire_shield)
-  :
-    fire_wpns.Add(false)
-func _cache_ice_weapons()
-  ?some(ice_1h)
-    ice_wpns.Add(ice_1h)
-  :
-    ice_wpns.Add(false)
-  ?some(ice_aa)
-    ice_wpns.Add(ice_aa)
-  :
-    ice_wpns.Add(false)
-  ?some(ice_wand)
-    ice_wpns.Add(ice_wand)
-  :
-    ice_wpns.Add(false)
-  ?some(ice_shield)
-    ice_wpns.Add(ice_shield)
-  :
-    ice_wpns.Add(false)
-func _cache_poison_weapons()
-  ?some(poison_1h)
-    poison_wpns.Add(poison_1h)
-  :
-    poison_wpns.Add(false)
-  ?some(poison_aa)
-    poison_wpns.Add(poison_aa)
-  :
-    poison_wpns.Add(false)
-  ?some(poison_wand)
-    poison_wpns.Add(poison_wand)
-  :
-    poison_wpns.Add(false)
-  ?some(poison_shield)
-    poison_wpns.Add(poison_shield)
-  :
-    poison_wpns.Add(false)
-func _cache_vigor_weapons()
-  ?some(vigor_1h)
-    vigor_wpns.Add(vigor_1h)
-  :
-    vigor_wpns.Add(false)
-  ?some(vigor_aa)
-    vigor_wpns.Add(vigor_aa)
-  :
-    vigor_wpns.Add(false)
-  ?some(vigor_wand)
-    vigor_wpns.Add(vigor_wand)
-  :
-    vigor_wpns.Add(false)
-  ?some(vigor_shield)
-    vigor_wpns.Add(vigor_shield)
-  :
-    vigor_wpns.Add(false)
+// func test()
+//   _elems = ["aether"]
+//   found = get_equipment("melee", false)
+//   dbg("aether melee 1: " + found)
+//   _main_hand = found
+//   found = get_equipment("melee", false)
+//   dbg("aether melee 2: " + found)
+//   found = get_equipment("shield", false)
+//   dbg("fire shield: " + found)
+  
+//   _elems = ["ice"]
+//   found = get_equipment("shield", false)
+//   dbg("ice shield: " + found)
 
 /****************
 **   #Runtime  **
 ****************/
 ?loc.begin
-  _cache_ability_weapons()
-  _cache_best_weapons()
-  _cache_aether_weapons()
-  _cache_fire_weapons()
-  _cache_ice_weapons()
-  _cache_poison_weapons()
-  _cache_vigor_weapons()
+  // enable_hit_tracking = true
+  // ?loc = caves | loc = halls
+  //   prefer_ranged = true
   _fill_status_uids()
-  ?item.potion = empty
-    brew_pot()
+  _fill_items_cache()
+  // ?item.potion = empty
+  //   brew_pot()
 :?loc.loop
   reset_loop()
 :?ai.enabled & !ai.paused
   prelude()
   progress()
-  draw_ui()
 :
   idle()
+// test()
+draw_ui()
+// loc.Pause()
