@@ -26,9 +26,8 @@ Copy contents of `scribble.txt` into your Mindstone and configure your weapons a
 
 - Only tested on iOS version
 - Mobile version doesn't support arbitrary `import`s, so all code is contained in a single file.
-- Tested mostly on blue-level zones (6 to 10 stars) and a bit on white-levels (1-5)
-- Only the following Lost Items are supported (because I don't have the rest): `Skeleton Arm`, `Bashing Shield`, `Blade of the Fallen God`
-- Doesn't support staffs or warhammers
+- Tested mostly on blue-level zones (6 to 10 stars) and a bit on white-levels (1-5) and very little in yellow (11+)
+- Only the following Lost Items are supported (because I don't have the rest): `Skeleton Arm`, `Bashing Shield`, `Blade of the Fallen God`, `Cultist Mask`
 - Doesn't do AAC for normal weapons, only for specials (heavy hammer, bardiche, skeleton arm). If you don't know what AAC is, don't worry about it :)
 - Doesn't support potions besides Healing and Vampiric
 
