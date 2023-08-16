@@ -94,7 +94,7 @@
 // Fill `elemental_items` with your items.
 // Format:
 // ["weapon type", 
-//   ["element1", "suffix1", .., "suffixN"],
+//   ["element1", "suffix + enchant", ...],
 //   ["element2", "suffix1", .., "suffixN"],
 // ]
 // Only list items that you actually want to use,
@@ -103,10 +103,19 @@
 // priority: better ones first. Multiple copies
 // of the same suffix for the same item
 // will be ignored.
+// "default" items will be used if no suitable 
+// elemental weapon is found, and against
+// non-elemental enemies. They must be 
+// written with their full names.
+// If no "default" items are listed for 
+// a category, then items from other elements
+// will be used (but not the enemy's element).
 
 var elemental_items = [
   ["warhammer", 
     ["aether", "D"],
+    ["fire", "dF", "D"],
+    ["default", "stone warhammer + 1"],
   ],
   ["wand", 
     ["fire", "D"],
@@ -119,13 +128,29 @@ var elemental_items = [
     ["ice", "dI"],
     ["poison", "dP"],
     ["vigor", "dL"],
+    ["default", "sword + 1", "big sword + 2"],
   ],
   ["shield", 
     ["vigor", "ah"],
     ["poison", "ap"],
     ["ice", "A"],
+    ["default", "composite"],
   ],
 ]
+
+// func test()
+//   _elems = ["aether"]
+//   found = get_equipment("melee", false)
+//   dbg("aether melee 1: " + found)
+//   _main_hand = found
+//   found = get_equipment("melee", false)
+//   dbg("aether melee 2: " + found)
+//   found = get_equipment("shield", false)
+//   dbg("fire shield: " + found)
+  
+//   _elems = ["ice"]
+//   found = get_equipment("shield", false)
+//   dbg("ice shield: " + found)
 
 // Items with special abilities.
 // Supported: "dashing", "bardiche", 
@@ -265,7 +290,7 @@ func progress()
     return fight_bolesh()
     // TODO ceiling decorator
   :?loc = fungus_forest_boss
-    return fight_mushroom()
+    return fight_mushrooms()
   :?loc = undead_crypt_boss
     return fight_pallas()
   :?loc = bronze_guardian
@@ -807,6 +832,9 @@ func fight_bolesh()
   ^(foe.time > 12 & foe.time < 18)
     // try to evade bites
     shield_block(true)
+  :?foe.state = 142 & foe.time > 53
+    // evade melee bite
+    backflip()
   :?bfg_quest = "bolesh" & 
   ^(foe_ehp < edmg(smite_damage))
     ?come_closer()
@@ -822,29 +850,82 @@ func fight_bolesh()
   :
     ranged()
 
-func fight_mushroom()
-  ?loc.stars > 5
-    disable_steal = true
+func try_evade()
+  ?mindCD <= 0
+    return backflip()
+  return shield_block(false)
+
+func fight_mushrooms()
+  disable_steal = true
   ?foe = phase1
     ?foe.state = 32 & foe.time > 46
       // big swing
-      ?mindCD <= 0
-        return backflip()
-      :
-        return shield_block(false)
-    :?foe.state = 33 & 
-    ^foe.time > 5 & foe.time < 8
+      return try_evade()
+    :?foe.state = 33 & foe.time = 7
       // pellets
       return shield_block(false)
-  :?foe = mushroom_boss
+  :?foe = mushroom_boss_fat
+    // we're fighting both Morel and Enoki,
+    // but only Morel's state is visible.
+    // So fo Enoki we'll have to time his attacks
+    // What's worse is that they both can be
+    // stunned, which shifts their timings.
+    shroom_timer++
+    var big_swing
+    ?loc.stars < 13
+      big_swing = 59
+    :
+      big_swing = 56
+    ?foe_debuffs = stun_debuff
+      morel_stunned++
+      ?hammerCD > 0 // stuns both
+        enoki_stunned++      
     ?foe.state = 32 & 
-    ^((foe.time > 28 & foe.time < 31) |
-    ^foe.time > 61)
-      // big swing
-      ?mindCD <= 0
-        return backflip()
+    ^foe.time = (big_swing + morel_stunned)
+      // Morel's big swing is priority
+      morel_stunned = 0 // reset stun delay
+      return try_evade()
+    :
+      // Enoki's pellets fire with a set rate,
+      // and start at the set time, so we can
+      // block each of them. There's 1-frame
+      // variance for the first pellet, so we 
+      // block for 2 frames.
+      var pellet_rate
+      var first_pellet
+      ?loc.stars < 6
+        first_pellet = foe_dist + 26
+        pellet_rate = 41
       :
+        first_pellet = foe_dist + 16
+        pellet_rate = 46 - loc.stars * 2
+        ?loc.stars > 12
+          pellet_rate-- // hmmm?
+      var diff = shroom_timer - first_pellet - enoki_stunned
+      var should_block = diff >= 0 & 
+      ^((diff < 2) | (diff % pellet_rate < 2))
+      ?should_block
+        enoki_stunned = 0 // reset stun delay
         return shield_block(false)
+        //46 - 26 = 20 , but real rate=21
+        // stunned at 20, next pellet was supposed to launch at 23, but launched at 35
+        
+        // 2 -> (23) -> 35
+        // (stun 12) 51, 72, 90, 111, 132, 153, 178, 198, 219, 241, 262
+        // d5: 283, 304, 325, 346, 367, 388, 409, 430, 451, 472, 493, 507
+        // D3: 524, 544, 565, 586, 607, 628, 649
+        // ?   670,
+        // d3: 691, 712, 733, 754, 775, 796, 817, 838, 
+        // D5: 857, 878, 899, 920, 941, 962, 983, 1004, 1025, 1046
+
+        // diffs: 
+        // 21, 18, 21, 21, 21, 25, 21, 21, 21, 21
+        // 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21,
+        // 21, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21
+        // 17, 21, 21, 21, 21, 21, 21, 21, 21, 21
+  : // Enoki themself
+    ?foe.state = 33 & foe.time = foe_dist - 2
+      return shield_block(false)
   auto_melee_boss()
 
 func fight_pallas()
@@ -1032,6 +1113,9 @@ var pickpocket_buff = "pick_pocket"
 // misc
 var at_boss = false // to deal with adds
 var naga_step = 0 // nagaraja fight
+var shroom_timer = 0 // mushrooms
+var enoki_stunned = 0 // mushrooms
+var morel_stunned = 0 // mushrooms
 // player status
 var stance = "unknown" // chosen combat stance
 var low_hp = false // hp < (maxhp * threshold)
@@ -1078,6 +1162,174 @@ var st_x = [] // unknown status effects
 var status_uids = []
 var errors = []
 var cache = []
+
+var have_bard = 
+^special_items.IndexOf("bardiche") ! -1
+var have_ham = 
+^special_items.IndexOf("heavy hammer") ! -1
+var have_dashing = 
+^special_items.IndexOf("dashing") ! -1
+var have_bashing = 
+^lost_items.IndexOf("bashing") ! -1
+var have_arm = 
+^lost_items.IndexOf("arm") ! -1
+var have_blade = 
+^lost_items.IndexOf("blade") ! -1
+var have_mask = 
+^lost_items.IndexOf("mask") ! -1
+
+var type_offsets = [
+  "sword", "big sword", "wand",
+  "shield", "crossbow", "staff", 
+  "warhammer",
+  ]
+var elem_offsets = [
+  "aether", "fire", "ice", "poison", "vigor",
+  "default",
+  ]
+var equipment = [
+  // Each element of this array is
+  // [[damage/armor items], [debuff items]]
+  // they're placed by equip offset, then by
+  // elem offset.
+  // For example: first element is aether swords, 
+  // seconds is fire swords, sixth is aether 
+  // big swords.
+  // See also: get_item()
+]
+// "{element} {type} {suffix + enchant}"
+var name_template = "{0} {1} {2}"
+func _fill_items_cache()
+  // add placeholders for every type+element pair
+  for i = 0 .. (type_offsets.Count() * 
+    ^elem_offsets.Count())
+    equipment.Add([[], []])
+   // `it` is 
+   // ["type": ["elem", "s1", "sn"], [elem2...]]
+  for it : elemental_items
+    ?it.Count() > 1
+      for i = 1 .. it.Count() - 1
+        //`el_it` is ["elem", "s1", "sn"]
+        var el_it = it[i]
+        ?el_it.Count() < 2
+          i++ // continue
+        ty = it[0] // item type
+        var elem = el_it[0] // item element
+        var offset = type_offsets.IndexOf(ty) *
+        ^ 5 + elem_offsets.IndexOf(elem)
+        // for every suffix in list
+        for j = 1 .. el_it.Count() - 1
+          var suffix = el_it[j]
+          // `slot` is 
+          // [[dmg items], [debuff items]]
+          var slot = equipment[offset]
+          var full_name
+          ?elem = "default"
+            full_name = suffix
+            ?slot[0].IndexOf(full_name) = -1
+              slot[0].Add(full_name)
+          :
+            full_name = string.Format(
+            ^name_template, elem, ty, suffix)
+            ?is_debuff(suffix) & 
+              ^slot[1].IndexOf(full_name) = -1
+              slot[1].Add(full_name)
+            :?slot[0].IndexOf(full_name) = -1
+              slot[0].Add(full_name)
+
+var debuff_suffixes = "fFiIpPhL"
+func is_debuff(suffix)
+  ?string.Size(suffix) < 2
+    return false
+  // check second symbol of the suffix
+  return string.IndexOf(debuff_suffixes,
+  ^string.Sub(suffix, 1, 1)) ! -1
+
+// ty: "melee" | "wand" | "crossbow" | "shield"
+// debuff: bool
+func get_equipment(ty, debuff)
+  // first try the preferred element
+  found = get_elem_equipment(ty, _elems[0],
+  ^debuff)
+  ?found
+    return found
+  // they try the default
+  found = get_item(ty, "default", debuff)
+  ?found
+    return found
+  // they try the rest of the elements
+  for i = 1 .. _elems.Count() - 1
+    var elem = _elems[i]
+    found = get_elem_equipment(ty, elem, debuff)
+    ?found
+      return found
+  return false
+
+var melee_1h_weapons = [
+  "sword", "big sword", "warhammer"
+]
+var melee_aa_weapons = [
+  "warhammer", "sword", "big sword"
+]
+func get_elem_equipment(ty, elem, debuff)
+  found = false
+  var arr
+  ?ty = "melee"
+    ?foe.armor > 0
+      arr = melee_aa_weapons
+    :
+      arr = melee_1h_weapons
+    for ty : melee_1h_weapons
+      found = get_item(ty, elem, debuff)
+      ?found
+        return found
+  :?ty = "wand"
+    return get_item("wand", elem, debuff)
+  :?ty = "crossbow"
+    return get_item("crossbow", elem, debuff)
+  :?ty = "shield"
+    return get_item("shield", elem, debuff)
+  :?ty = "staff"
+    return get_item("staff", elem, debuff)
+  :
+    dbg("get_elem_equipment(): unsupported type="
+    ^+ ty)
+  return false
+
+// ty: "melee" | "wand" | "crossbow" | shield
+// debuff: bool
+func maybe_healing_equipment(ty)
+  found = false
+  ?low_hp
+    found = get_elem_equipment(ty, "vigor", true)
+  ?!found
+    found = get_equipment(ty, false)
+  return found
+
+// ty: wand, sword, etc
+// element: aether, fire, etc
+// debuff: bool (true/false)
+func get_item(ty, element, debuff)
+  var offset = type_offsets.IndexOf(ty) * 5 + 
+  ^elem_offsets.IndexOf(element)
+  var slot = equipment[offset]
+  ?!debuff
+    found = _find_first(slot[0], _main_hand)
+    // if D item not found, try to find dX item
+  ?debuff | !found
+    found = _find_first(slot[1], _main_hand)
+  return found
+
+func _find_first(arr, exclude)
+  ?arr.Count() > 0
+    for it : arr
+      ?!exclude | !string.Equals(exclude, it)
+        return it
+  return false  
+
+func main_hand(it)
+  equipL @it@
+  _main_hand = it
 
 func _fill_status_uids()
   for st_info : statuses
@@ -1166,17 +1418,20 @@ func prelude()
   ?loc = halls | foe = aether
     _elems = ["vigor", "fire", "ice", "poison"]
   :?loc = mine | foe = fire
-    _elems = ["aether", "ice", "poison", "vigor"]
+    _elems = ["aether", "ice", 
+    "poison", "vigor"]
   :?loc = ridge | foe = ice
-    _elems = ["fire", "aether", "poison", 
-    "vigor"]
+    _elems = ["fire", "aether", 
+    "poison", "vigor"]
   :?loc = caves | loc = temple | foe = poison
-    _elems = ["ice", "aether", "fire", "vigor"]
+    _elems = ["ice", "aether", 
+    "fire", "vigor"]
   :?loc = mushroom | foe = vigor
-    _elems = ["poison", "aether", "fire", "ice"]
+    _elems = ["poison", "aether", 
+    "fire", "ice"]
   :
-    _elems = ["vigor", "aether", "fire", 
-    "ice", "poison"]
+    _elems = ["default", "vigor", "aether", 
+    "fire", "ice", "poison"]
 
   mindCD = item.GetCooldown("mind")
   staffCD = item.GetCooldown("quarterstaff")
@@ -1242,9 +1497,7 @@ func draw_ui()
       >`@cd_ui_x@,@cd_ui_y@,#@colorize(dashCD,
       ^can_dash())@,D
     
-    >`1,20,#blue,Low HP: @low_hp@
-    ?low_hp
-      >`9,20,#red,@low_hp@
+    >`1,20,#blue,Enoki timer: @shroom_timer@
     >`1,21,#blue,Stance: @stance@
     ?foe
       >`1,13,#7A8F93,+ @foe_buffs@
@@ -1272,159 +1525,11 @@ func brew_pot()
 func reset_loop()
   at_boss = false
   naga_step = 0
+  shroom_timer = 0
+  enoki_stunned = 0
+  morel_stunned = 0
   cache.Clear()
   st_x.Clear()
-
-var have_bard = 
-^special_items.IndexOf("bardiche") ! -1
-var have_ham = 
-^special_items.IndexOf("heavy hammer") ! -1
-var have_dashing = 
-^special_items.IndexOf("dashing") ! -1
-var have_bashing = 
-^lost_items.IndexOf("bashing") ! -1
-var have_arm = 
-^lost_items.IndexOf("arm") ! -1
-var have_blade = 
-^lost_items.IndexOf("blade") ! -1
-var have_mask = 
-^lost_items.IndexOf("mask") ! -1
-
-var type_offsets = [
-  "sword", "big sword", "wand",
-  "shield", "crossbow", "staff", 
-  "warhammer"
-  ]
-var elem_offsets = [
-  "aether", "fire", "ice", "poison", "vigor"
-  ]
-var equipment = [
-  // Each element of this array is
-  // [[damage/armor items], [debuff items]]
-  // they're placed by equip offset, then by
-  // elem offset.
-  // For example: first element is aether swords, 
-  // seconds is fire swords, sixth is aether 
-  // big swords.
-  // See also: get_item()
-]
-// template: "<element> <type> <suffix>"
-var name_template = "{0} {1} {2}"
-func _fill_items_cache()
-  // add placeholders for every type+element pair
-  for i = 0 .. (type_offsets.Count() * 
-    ^elem_offsets.Count())
-    equipment.Add([[], []])
-   // `it` is 
-   // ["type": ["elem", "s1", "sn"], [elem2...]]
-  for it : elemental_items
-    ?it.Count() > 1
-      for i = 1 .. it.Count() - 1
-        //`el_it` is ["elem", "s1", "sn"]
-        var el_it = it[i]
-        ?el_it.Count() < 2
-          i++ // continue
-        ty = it[0] // item type
-        var elem = el_it[0] // item element
-        var offset = type_offsets.IndexOf(ty) *
-        ^ 5 + elem_offsets.IndexOf(elem)
-        // for every suffix in list
-        for j = 1 .. el_it.Count() - 1
-          var suffix = el_it[j]
-          // `slot` is 
-          // [[dmg items], [debuff items]]
-          var slot = equipment[offset]
-          var full_name = string.Format(
-            ^name_template, elem, ty, suffix)
-          ?is_debuff(suffix) & 
-            ^slot[1].IndexOf(full_name) = -1
-            slot[1].Add(full_name)
-          :?slot[0].IndexOf(full_name) = -1
-            slot[0].Add(full_name)
-
-var debuff_suffixes = "fFiIpPhL"
-func is_debuff(suffix)
-  ?string.Size(suffix) < 2
-    return false
-  // check second letter of the suffix
-  return string.IndexOf(debuff_suffixes,
-  ^string.Sub(suffix, 1, 1)) ! -1
-
-var melee_1h_weapons = [
-  "sword", "big sword", "warhammer"
-]
-var melee_aa_weapons = [
-  "warhammer", "sword", "big sword"
-]
-// ty: "melee" | "wand" | "crossbow" | "shield"
-// debuff: bool
-func get_equipment(ty, debuff)
-  found = false
-  for elem : _elems
-    found = get_elem_equipment(ty, elem, debuff)
-    ?found
-      return found
-  return false
-
-func get_elem_equipment(ty, elem, debuff)
-  found = false
-  var arr
-  ?ty = "melee"
-    ?foe.armor > 0
-      arr = melee_aa_weapons
-    :
-      arr = melee_1h_weapons
-    for ty : melee_1h_weapons
-      found = get_item(ty, elem, debuff)
-      ?found
-        return found
-  :?ty = "wand"
-    return get_item("wand", elem, debuff)
-  :?ty = "crossbow"
-    return get_item("crossbow", elem, debuff)
-  :?ty = "shield"
-    return get_item("shield", elem, debuff)
-  :?ty = "staff"
-    return get_item("staff", elem, debuff)
-  :
-    dbg("get_elem_equipment(): unsupported type="
-    ^+ ty)
-  return false
-
-// ty: "melee" | "wand" | "crossbow" | shield
-// debuff: bool
-func maybe_healing_equipment(ty)
-  found = false
-  ?low_hp
-    found = get_elem_equipment(ty, "vigor", true)
-  ?!found
-    found = get_equipment(ty, false)
-  return found
-
-// ty: wand, sword, etc
-// element: aether, fire, etc
-// debuff: bool (true/false)
-func get_item(ty, element, debuff)
-  var offset = type_offsets.IndexOf(ty) * 5 + 
-  ^elem_offsets.IndexOf(element)
-  var slot = equipment[offset]
-  ?!debuff
-    found = _find_first(slot[0], _main_hand)
-    // if D item not found, try to find dX item
-  ?debuff | !found
-    found = _find_first(slot[1], _main_hand)
-  return found
-
-func _find_first(arr, exclude)
-  ?arr.Count() > 0
-    for it : arr
-      ?!exclude | !string.Equals(exclude, it)
-        return it
-  return false  
-
-func main_hand(it)
-  equipL @it@
-  _main_hand = it
 
 /****************
 **   #Runtime  **
@@ -1443,4 +1548,6 @@ func main_hand(it)
   progress()
 :
   idle()
+// test()
 draw_ui()
+// loc.Pause()
