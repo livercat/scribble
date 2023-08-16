@@ -1,8 +1,10 @@
 Version 1.2
  - Majorer reorganization and clean up!
- - Weapons are easier to configure and support.
-   all weapon types, multiple weapons per element,
-   as well as non-elemental weapons.
+ - Weapons are much easier to configure 
+  (see the comments at the top of the script for details)
+ - Added support for all weapon types
+ - Added support for multiple weapons per element
+ - Added support for non-elemental weapons
  - Fixed most (all) cases where abilities 
    interrupted each other.
  - Added many more settings, including support
