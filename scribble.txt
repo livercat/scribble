@@ -928,7 +928,7 @@ func fight_hrimnir()
     ranged()
   :?foe.count > 1 // deal with adds
     ?slowed // don't waste time on movement
-      ?range < 7
+      ?eff_dist < 7
         auto_melee()
       :?foe.count > 2
         elemental_aoe()
