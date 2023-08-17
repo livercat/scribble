@@ -1,115 +1,4 @@
-// "scribble"
-// StoneScript automation for Stone Story RPG
-// Ver. 1.2
-// Project: https://github.com/livercat/scribble
-// by livercat
 
-/***************
-**  #Intro    **
-***************/
-// Some variable names are shorter
-// than I would prefer for readability,
-// but Mindstone has line limit of 49 chars
-
-// I use a mix of function arguments and
-// global variables for various pieces of logic.
-// I would prefer not to use global vars at all
-// to make it harder to miss something and easier
-// to follow the logic, but since we don't
-// have optional or default arguments,
-// functions would have very ugly signatures.
-// So func argument are used for weapon switching
-// where it's important to make sure everything
-// lines up correctly.
-
-// I also use a mix of conditional branching (:?)
-// and early return. Early returns
-// reduce line lenght and make funcs more 
-// readable. They are neat!
-
-// Main logic is in following functions:
-// prelude() - collects info from game state
-//   into global vars
-// progress() - entry point for combat logic
-//   and boss handling
-// fight() - main logic for choosing range and
-//   fighting special non-boss enemies
-// melee(), ranged(), elemental() - equip
-//   appropriate weapons
-// draw_ui() - draws UI :)
-
-//  *** Table of Contents ***
-// You can Ctrl-F for these anchors to quickly
-// go to the corresponding code
-//   #Weapons - configure your weapons
-//   #Settings - runtime and UI settings
-//   #Progress - (verb) entry point for the rest
-//               of the combat logic
-//   #Combat - logic for weapon switching 
-//             and ability use
-//   #Abilities - granular logic and conditions
-//                for abilities' prerequisites
-//   #Bosses - specific boss mechanics
-//   #Internals - var declarations and boring
-//                internal functions
-//   #Runtime - actual place where the script is 
-//              executed
-
-
-/***************
-**  #Weapons  **
-***************/
-// Each elemental weapon aside from staffs
-// and warhammers has two variants: "D" or "dX",
-// where "X" is the elemental modifier
-// ("A" and "ax" for shields).
-// Staffs and warhammers instead have six! 
-// "A", "D", "ax", "aX", "dx", "dX".
-// You can mutate between them using moondial.
-
-// Meaning of letters in suffix:
-// "A": get armor on egage for each foe
-// "D": attack bonus vs correct element
-// "x": on being hit, chance to: unmake (aether),
-//      fire dot, chill (ice), +attack (poison),
-//      heal (vigor)
-// "X": on attack, chance to: unmake (aether),
-//      fire dot, chill (ice), lifesteal (vigor),
-//      reduce foe attack (poison)
-
-// Full list of suffixes:
-// Defensive: staffs, warhammers, shields
-//   "au", "af", "ai", "ap", "ah", "A"
-// Offensive: staffs, warhammers, swords, xbows
-//   "dU", "dF", "dI", "dP", "dL", "D"
-// Exclusive to staffs and warhammers:
-//   "aU", "aF", "aI", "aP", "aL",
-//   "du", "df", "di", "dp", "dh"
-
-// Note that vigor has 2 different letters:
-// "L" for offensive lifesteal and "h" for
-// defensive "heal on being hit".
-// There are no "l" or "H" modifiers.
-
-// Fill `elemental_items` with your items.
-// Format:
-// ["weapon type", 
-//   ["element1", "suffix + enchant", ...],
-//   ["element2", "suffix1", .., "suffixN"],
-// ]
-// Only list items that you actually want to use,
-// otherwise script can grab a random *0 that
-// you got from a chest. Also list suffixes by
-// priority: better ones first. Multiple copies
-// of the same suffix for the same item
-// will be ignored.
-// "default" items will be used if no suitable 
-// elemental weapon is found, and against
-// non-elemental enemies. They must be 
-// written with their full names.
-// If no "default" items are listed for 
-// a category, then items from other elements
-// will be used (but not the enemy's element).
 
 var elemental_items = [
   ["warhammer", 
@@ -154,6 +43,10 @@ var lost_items = [
 // full name of the shield with the highest
 // evade%
 var evade_shield = "vigor ah"
+
+// full name of the shield with the highest
+// armor/regen
+var armor_shield = "dashing"
 
 // Weapon type to prefer for melee aoe:
 // "staff", "bardiche", "heavy hammer" will 2h.
@@ -713,7 +606,7 @@ func can_bard()
 
 // bardiche
 func should_bard()
-  return can_bard()
+  return is_boss & can_bard()
 
 // bardiche
 func bardiche()
@@ -756,6 +649,8 @@ func use_abilities()
     return bardiche()
   ?should_slap()
     return slap()
+  ?should_mask()
+    return mask()
   return false
 
 func can_activate()
@@ -810,10 +705,15 @@ func shield_block_and_halt()
 func fight_scout()
   ?mask_quest = "prevent"
     equipL quest
-    equipR mask
-
+    ?foe.state = 32 & foe.time > 11 & can_mask()
+      mask()
+    :?maskCD > 0 & 
+    ^foe_debuffs ! "debuff_feeble"
+      loc.Pause()
+    :
+      equipR @armor_shield@
   :
-    dbg("TODO")
+    auto_melee_boss()    
 
 func fight_dysan()
   ?foe = phase1
@@ -866,10 +766,10 @@ func fight_bolesh()
   ?foe.state = 133 &
   ^(foe.time > 12 & foe.time < 18)
     // block bite and don't move from ranged
-    shield_block_and_halt()
+    return shield_block_and_halt()
   :?foe.state = 142 & foe.time > 53
     // evade melee bite
-    backflip()
+    return backflip()
   :?bfg_quest = "bolesh" & 
   ^(foe_ehp < edmg(smite_damage))
     ?come_closer()
@@ -877,14 +777,12 @@ func fight_bolesh()
     :
       equip @blade@
   :?mindCD <= 0 &
-  ^foe_buffs ! "spider_buff_damage" & 
-  ^(use_abilities() | debuff("dps"))
-    auto_melee_boss()
+  ^foe_buffs ! "spider_buff_damage"
+    return auto_melee_boss()
   :?mindCD <= 0 & foe_dist < 10
-    backflip()
-  :
-    ranged()
-
+    return backflip()
+  ranged()
+  
 func try_evade()
   ?mindCD <= 0
     return backflip()
@@ -1151,6 +1049,7 @@ var last_frame_hp = 0
 var last_frame_foe = ""
 var last_frame_dist = 0
 var last_frame_state = -1
+var last_frame_time = -1
 // cooldowns
 var mindCD = 0
 var staffCD = 0
@@ -1214,8 +1113,9 @@ var equipment = [
 var name_template = "{0} {1} {2}"
 func _fill_items_cache()
   // add placeholders for every type+element pair
-  for i = 0 .. (type_offsets.Count() * 
-    ^elem_offsets.Count())
+  var total_types = type_offsets.Count()
+  var total_elems = elem_offsets.Count()
+  for i = 0 .. (total_types * total_elems) - 1
     equipment.Add([[], []])
    // `it` is 
    // ["type": ["elem", "s1", "sn"], [elem2...]]
@@ -1228,8 +1128,9 @@ func _fill_items_cache()
           i++ // continue
         ty = it[0] // item type
         var elem = el_it[0] // item element
-        var offset = type_offsets.IndexOf(ty) *
-        ^ 5 + elem_offsets.IndexOf(elem)
+        var offset = 
+        ^type_offsets.IndexOf(ty) * total_elems +
+        ^elem_offsets.IndexOf(elem)
         // for every suffix in list
         for j = 1 .. el_it.Count() - 1
           var suffix = el_it[j]
@@ -1266,8 +1167,10 @@ func get_equipment(ty, debuff)
   ^debuff)
   ?found
     return found
-  // they try the default
-  found = get_item(ty, "default", debuff)
+  // they try the default (need the concrete
+  // item type instead of generic "melee")
+  found = get_item(disambiguate_type(ty, true),
+  ^"default", debuff)
   ?found
     return found
   // they try the rest of the elements
@@ -1277,6 +1180,18 @@ func get_equipment(ty, debuff)
     ?found
       return found
   return false
+
+func disambiguate_type(ty, only_one)
+  ?ty = "melee"
+    var arr
+    ?foe.armor > 0
+      arr = melee_aa_weapons
+    :
+      arr = melee_1h_weapons
+    ?only_one
+      return arr[0]
+    return arr
+  return ty
 
 var melee_1h_weapons = [
   "sword", "big sword", "warhammer"
@@ -1288,12 +1203,8 @@ func get_elem_equipment(ty, elem, debuff)
   found = false
   var arr
   ?ty = "melee"
-    ?foe.armor > 0
-      arr = melee_aa_weapons
-    :
-      arr = melee_1h_weapons
-    for ty : melee_1h_weapons
-      found = get_item(ty, elem, debuff)
+    for tt : disambiguate_type("melee", false)
+      found = get_item(tt, elem, debuff)
       ?found
         return found
   :?ty = "wand"
@@ -1323,7 +1234,9 @@ func maybe_healing_equipment(ty)
 // element: aether, fire, etc
 // debuff: bool (true/false)
 func get_item(ty, element, debuff)
-  var offset = type_offsets.IndexOf(ty) * 5 + 
+  var total_elems = elem_offsets.Count()
+  var offset = 
+  ^type_offsets.IndexOf(ty) * total_elems + 
   ^elem_offsets.IndexOf(element)
   var slot = equipment[offset]
   ?!debuff
@@ -1408,19 +1321,22 @@ func parse_statuses()
 func track_hits()
   var hp_diff = last_frame_hp - hp
   ?hp_diff > 0
-    >`15,2,#red,Got hit!
-    >`15,3,Last frame info:
-    >`15,4,last_frame_hp=@last_frame_hp@ (diff=
+    >`20,2,#red,Got hit!
+    >`20,3,Last frame info:
+    >`20,4,hp = @last_frame_hp@ (diff = 
     ^@hp_diff@), 
-    ^last_frame_armor=@last_frame_armor@
-    >`15,5,id=@last_frame_foe@
-    >`15,6,dist=@last_frame_dist@
-    >`15,7,state=@last_frame_state@
+    ^armor = @last_frame_armor@
+    >`20,5,id = @last_frame_foe@
+    >`20,6,dist = @last_frame_dist@
+    >`20,7,state = @last_frame_state@
+    >`20,8,time = @last_frame_time@
+    loc.Pause()
   last_frame_armor = armor
   last_frame_hp = hp
   last_frame_foe = foe.id
   last_frame_dist = foe_dist
   last_frame_state = foe.state
+  last_frame_time = foe.time
 
 func prelude()
   parse_statuses()
@@ -1487,12 +1403,10 @@ func prelude()
   :
     _elems = ["default", "vigor", "aether", 
     "fire", "ice", "poison"]
-
 func dbg(e)
   ?ui_show_debug
     ?errors.IndexOf(e) = -1
       errors.Add(e)
-
 func draw_ui()
   var sy = 22
   ?ui_show_debug
@@ -1504,7 +1418,6 @@ func draw_ui()
     ^- @string.Join(", ", st_bad)@
     >`1,@sy+2@,#F008B2,
     ^? @string.Join(", ", st_x)@
-
   ?ui_show_cd
     var cd_ui_y = 6
     >`1,@cd_ui_y@,#@colorize(mindCD, true)@,
@@ -1529,7 +1442,6 @@ func draw_ui()
       cd_ui_y++
       >`1,@cd_ui_y@,#@colorize(maskCD, true)@,
       ^Mask @time.FormatDigital(maskCD)@
-
   ?ui_show_debug
     cd_ui_y++
     var cd_ui_x = 1
@@ -1547,13 +1459,11 @@ func draw_ui()
       cd_ui_x++
       >`@cd_ui_x@,@cd_ui_y@,#@colorize(dashCD,
       ^can_dash())@,D
-
-    >`1,23,#blue,Lock=@ability_lock@,ai.idle=
-    ^@ai.idle@,dashCD=@dashCD@,bashCD=@bashCD@
-
+    >`1,23,#blue,Lock: @ability_lock@,
+    ^maskCD: @maskCD@
     >`1,24,#blue,Stance: @stance@
     ?foe
-      >`1,13,#7A8F93,+ @foe_buffs@
+      >`1,13,#7A8F93,@foe_buffs@~@foe_debuffs@
       >`1,14,#7A8F93,id: @foe.id@
       >`1,15,#7A8F93,State: @foe.state@
       >`1,16,#7A8F93,Time: @foe.time@
@@ -1561,22 +1471,18 @@ func draw_ui()
       >`1,18,#7A8F93,Count: @foe.count@
     >`1,25,#7A8F93,@loc.stars@* 
     ^@time.FormatDigital(totaltime)@ @foe@
-
     var ey = 2
     for err : errors
-      >`15,@ey@,#red,@err@
+      >`20,@ey@,#red,@err@
       ey++
-
 func colorize(cd, allowed)
   ?cd > 0
     return "red"
   ?!allowed
     return "FE6800"
   return "green"
-
 func brew_pot()
   brew tar + bronze // vampiric
-
 func reset_loop()
   ability_lock = false
   at_boss = false
@@ -1584,31 +1490,28 @@ func reset_loop()
   cache.Clear()
   st_x.Clear()
 
-// func test()
-//   _elems = ["aether"]
-//   found = get_equipment("melee", false)
-//   dbg("aether melee 1: " + found)
-//   _main_hand = found
-//   found = get_equipment("melee", false)
-//   dbg("aether melee 2: " + found)
-//   found = get_equipment("shield", false)
-//   dbg("fire shield: " + found)
-  
-//   _elems = ["ice"]
-//   found = get_equipment("shield", false)
-//   dbg("ice shield: " + found)
+func test()
+  _elems = ["ice", "aether", "fire", "vigor"]
+  found = get_equipment("melee", false)
+  dbg("ice melee 1: " + found)
+  _main_hand = found
+  found = get_equipment("melee", false)
+  dbg("ice melee 2: " + found)
+  _main_hand = false
+  found = maybe_healing_equipment("melee")
+  dbg("ice melee 3: " + found)
+  _main_hand = found
+  found = maybe_healing_equipment("melee")
+  dbg("ice melee 4: " + found)
 
-/****************
-**   #Runtime  **
-****************/
 ?loc.begin
-  // enable_hit_tracking = true
-  // ?loc = caves | loc = halls
-  //   prefer_ranged = true
+  enable_hit_tracking = false
+  ?loc = halls
+    prefer_ranged = true
   _fill_status_uids()
   _fill_items_cache()
-  // ?item.potion = empty
-  //   brew_pot()
+  ?item.potion = empty
+    brew_pot()
 :?loc.loop
   reset_loop()
 :?ai.enabled & !ai.paused
@@ -1616,6 +1519,7 @@ func reset_loop()
   progress()
 :
   idle()
-// test()
+test()
 draw_ui()
-// loc.Pause()
+loc.Pause()
+//1
