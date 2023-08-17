@@ -1,5 +1,3 @@
-
-
 var elemental_items = [
   ["warhammer", 
     ["aether", "D"],
@@ -106,7 +104,8 @@ var max_chill = 6
 // for the Blade.
 // Stages: "bolesh" to kill him with blade,
 //         "variety" for killing unique enemies
-var bfg_quest = false
+//         "smite" for dealing smite damage
+var bfg_quest = "smite"
 
 // If you're on the "variety" step of the blade
 // quest, fill this array with names of the
@@ -187,7 +186,7 @@ func progress()
   :?loc = icy_ridge
     return fight_hrimnir()
   :?loc = nagaraja
-    return fight_nagajara()
+    return fight_nagaraja()
   :
     // unknown boss
     dbg("Fighting unknown boss")
@@ -197,9 +196,8 @@ func progress()
 func idle()
   stance = "out of combat"
   ?pickup.distance < 8
-    equipL star
     equipR triskelion
-    return
+    return main_hand(star)
   :?can_qs_dash()
     return qs_dash()
   :?hp < maxhp
@@ -228,7 +226,7 @@ func healwalk()
 func avoid_explosion()
   ?foe_dist < 5
     return try_evade()
-  ?foe.id = "fluff" & foe.state = 2 & foe.time > 3
+  ?foe.id = "fluff" & foe.state=2 & foe.time > 3
     return melee("def")
 
 /********************
@@ -246,11 +244,13 @@ func fight()
   :?ranged_st_weapon & 
   ^(prefer_ranged | must_ranged_foe())
     return auto_ranged()
+  :?string.Equals(bfg_quest, "smite") & smitten
+    return debuff("dps")
   :
     return auto_melee()
 
 func auto_melee()
-  ?mask_quest = "5debuffs"
+  ?string.Equals(mask_quest, "5debuffs")
     equipR mask
     ?can_mask()
       return mask()
@@ -273,33 +273,25 @@ func melee(mode)
   var offhand
   ?mode = "dps"
     stance = "melee dps"
-    ty = "melee"
     offhand = "melee"
   :?mode = "def"
     stance = "melee def"
-    ty = "melee"
     offhand = "shield"
   :?mode = "aoe"
     stance = "melee aoe"
     equip @melee_aoe_weapon@
     return
   :
-    dbg("melee(" + mode + "): unsupported mode="
-    ^+ mode)
-    return
+    return dbg("melee(" + mode + "): "
+    ^ + "unsupported mode")
   ?low_hp
     stance = stance + " vamp"
-  found = maybe_healing_equipment(ty)
+  found = maybe_healing_equipment("melee")
   ?found
     main_hand(found)
-  :
-    dbg("melee(" + mode + "): no weapon found")
   found = maybe_healing_equipment(offhand)
   ?found
     equipR @found@
-  :
-    dbg("melee(" + mode + "): no " + 
-    ^ offhand + " found")  
 
 func come_closer()
   ?should_qs_dash()
@@ -320,31 +312,25 @@ func auto_ranged()
 
 func ranged()
   stance = "ranged " + ranged_st_weapon
-  ?ranged_st_weapon = "repeating"
+  ?string.Equals(ranged_st_weapon, "repeating")
     equip @ranged_st_weapon@
     return
-  :?ranged_st_weapon = "xbows"
+  :?string.Equals(ranged_st_weapon, "xbows")
     ty = "crossbow"
-  :?ranged_st_weapon = "wands"
+  :?string.Equals(ranged_st_weapon, "wands")
     ty = "wand"
   :
-    dbg("ranged(): unsupported ranged_st_weapon="
-    ^+ ranged_st_weapon)
-    return
+    return dbg("ranged(): unsupported " +
+    ^"ranged_st_weapon=" + ranged_st_weapon)
   ?low_hp
     stance = stance + " vamp"
   found = maybe_healing_equipment(ty)
   ?found
     main_hand(found)
-  :
-    dbg("ranged(" + ranged_st_weapon + 
-    ^"): no weapon found")
   found = maybe_healing_equipment(ty)
   ?found
-    equipR @found@
-  :
-    dbg("ranged(" + ranged_st_weapon + 
-    ^"): no offhand found")
+    equipR @found@ // TODO this is the same
+    // as melee
 
 func auto_elemental()
   ?use_abilities()
@@ -356,56 +342,50 @@ func auto_elemental()
 
 func elemental_aoe()
   stance = "elemental"
-  ?ranged_aoe_weapon = "wands"
+  ?string.Equals(ranged_aoe_weapon, "wands")
     ty = "wand"
-  :?ranged_aoe_weapon = "staff"
+  :?string.Equals(ranged_aoe_weapon, "staff")
     ty = "staff"
   :
-    dbg("elemental_aoe(): unsupported " + 
+    return dbg("elemental_aoe(): unsupported " + 
     ^"ranged_aoe_weapon=" + ranged_aoe_weapon)
-    return
   ?low_hp
     stance = stance + " vamp"
   found = maybe_healing_equipment(
   ^ranged_aoe_weapon)
   ?found
     main_hand(found)
-  :
-    dbg("elemental_aoe(" + ranged_aoe_weapon +  
-    ^"):no weapon found")
-  ?ty = "staff"
+  ?string.Equals(ty, "staff")
     return
   // get second wand
   found = maybe_healing_equipment(ty)
   ?found
     equipR @found@
-  :
-    dbg("elemental_aoe(" + ranged_aoe_weapon + 
-    ^"): no offhand found")
 
 func can_dash()
   return can("dash") & !disable_dash & 
+  ^(have_bashing | have_dashing) &
   ^eff_dist > 10 & eff_dist < 17 &
-  ^(bashCD <= 0 | dashCD <= 0) &
+  ^(bashCD <= 0 & !disable_bash | dashCD <= 0) &
   ^can_activate()
 
 func dash()
-  ?!disable_bash & have_bashing & bashCD <= 0
+  ?have_bashing & bashCD <= 0
     stance = "bashing"
     equipR bashing
-  :?dashCD <= 0 & have_dashing
+  :?have_dashing & dashCD <= 0
     stance = "dashing"
     equipR dashing
   return true
 
 func must_ranged_foe()
-  return foe = mosquito | 
-  ^foe = huge_mosquito | 
-  ^foe = fire_elemental | foe = ant
+  return foe.id = mosquito | 
+  ^foe.id = huge_mosquito | 
+  ^foe.id = fire_elemental | foe = ant
 
 func must_melee_foe()
   return foe = immune_to_ranged | foe = ranged | 
-  ^foe = cult_guard // poisons on being hit
+  ^foe.id = cult_guard // poisons on being hit
 
 func auto_melee_boss()
   ?come_closer()
@@ -421,17 +401,18 @@ func auto_melee_boss()
 
 // mode: "dps" | "def"
 func debuff(mode)
-  ?foe_buffs = disable_debuff | 
+  ?foe_buffs = "buff_protection" | 
   ^foe_buffs = mirror
     return false
   var consider = []
-  ?!(foe_debuffs = foe_poisoned) &
+  ?!(foe_debuffs = "∞:debuff_damage:1:") &
   ^!(foe = immune_to_debuff_damage)
     consider.Add("poison")
-  :?!(foe_debuffs = foe_on_fire) &
+  :?!(foe_debuffs = "φ:debuff_dot:1:") &
   ^!(foe = immune_to_debuff_dot)
     consider.Add("fire")
-  :?!(foe_debuffs = max_chill_s) &
+  :?!(foe_debuffs = "❄:debuff_chill:" + 
+  ^max_chill + ":") &
   ^!(foe = immune_to_debuff_chill)
     consider.Add("ice")
   ?consider.Count() = 0
@@ -443,7 +424,7 @@ func debuff(mode)
     ?found
       main_hand(found)
       i = 999
-  ?mask_quest = "5debuffs"
+  ?string.Equals(mask_quest, "5debuffs")
     equipR mask
     return
   found = false
@@ -473,11 +454,11 @@ func debuff(mode)
 
 // Note on functions below:
 // can_<something>() checks hard prerequisites:
-//   cooldowns, statuses, etc.
+//   cooldowns, range, etc.
 // should_<something>() checks fight logic:
-//   number of enemies, statuses, etc.
-// <something>() actually uses trues to use
-//   the ability without doing checks itself
+//   when is it correct to use.
+// <something>() actually uses the ability 
+// without doing checks itself
 
 func can(ability)
   return !ability_lock | 
@@ -490,8 +471,8 @@ func can_qs_dash()
 
 // quarterstaff
 func should_qs_dash()
-  return (prefer_ranged & eff_dist > 28) |
-  ^eff_dist > 16 & can_qs_dash()
+  return ((prefer_ranged & eff_dist > 28) |
+  ^eff_dist > 16) & can_qs_dash()
 
 // quarterstaff
 func qs_dash()
@@ -503,10 +484,7 @@ func qs_dash()
 
 // Mind Stone
 func can_backflip()
-  // don't check this condition
-  // for boss mechanics (when free_mind is false)
-  return can("mind") & free_mind & 
-  ^mindCD <= 0 &
+  return can("mind") & free_mind & mindCD <= 0 &
    // don't jump into the wall
   ^screen.FromWorldX(pos.x) > 5
   
@@ -517,8 +495,6 @@ func backflip()
   found = get_equipment("shield", false)
   ?found
     equipR @found@
-  :
-    dbg("backflip(): no shield found")
 
 // skeleton arm
 func can_slap()
@@ -530,7 +506,6 @@ func can_slap()
   ^!slowed & !low_hp
     return true // get to max buffs
   return have_arm & armCD <= 0 & !disable_steal &
-  ^pickpocket_stacks >= max_pickpocket &
   ^can_activate()
 
 // skeleton arm
@@ -549,9 +524,8 @@ func slap()
 
 // blade of the fallen god
 func can_smite()
-  return can("smite") & 
-  ^have_blade & smiteCD <= 0 &
-  ^!disable_smite & 
+  return can("smite") & have_blade & 
+  ^!disable_smite & smiteCD <= 0 & 
   ^eff_dist <= 20 & (foe ! pallas) & // immune
   ^can_activate()
 
@@ -564,9 +538,8 @@ func should_smite()
           return false
       return true
     return false
-  :
-    return (is_boss | foe.count >= smite_treshold
-    ^& foe_ehp<=edmg(smite_damage)) & can_smite()
+  return (is_boss | foe.count >= smite_treshold
+  ^& foe_ehp<=edmg(smite_damage)) & can_smite()
 
 // blade of the fallen god
 func smite()
@@ -619,12 +592,15 @@ func bardiche()
 
 // mask
 func can_mask()
-  return can("mask") & have_mask & 
-  ^maskCD <= 0 & can_activate()
+  return can("mask") & have_mask & maskCD <= 0 &
+  ^(foe ! nagaraja) & can_activate()
 
 // mask
 func should_mask()
-  return is_boss & can_mask()
+  return (is_boss | 
+  ^string.Equals(mask_quest, "prevent") |
+  ^string.Equals(mask_quest, "simple")) &
+  ^can_mask()
 
 // mask
 func mask()
@@ -636,7 +612,8 @@ func mask()
 
 func use_abilities()
   // prioritize quests
-  ?mask_quest = "simple" & can_mask()
+  ?string.Equals(mask_quest, "simple") &
+  ^can_mask()
     return mask()
   ?pickpocket_quest & can_slap()
     return slap()
@@ -649,6 +626,7 @@ func use_abilities()
     return bardiche()
   ?should_slap()
     return slap()
+  // use mask right before debuffing
   ?should_mask()
     return mask()
   return false
@@ -703,33 +681,29 @@ func shield_block_and_halt()
   equipR @evade_shield@
 
 func fight_scout()
-  ?mask_quest = "prevent"
+  ?string.Equals(mask_quest, "prevent")
     equipL quest
     ?foe.state = 32 & foe.time > 11 & can_mask()
-      mask()
-    :?maskCD > 0 & 
-    ^foe_debuffs ! "debuff_feeble"
-      loc.Pause()
-    :
-      equipR @armor_shield@
+      return mask()
+    ?maskCD > 0 & foe_debuffs ! "debuff_feeble"
+      return loc.Leave()
+    equipR @armor_shield@
   :
     auto_melee_boss()    
 
-func fight_dysan()
+func fight_dysan() // REDO
   ?foe = phase1
     disable_steal = true
     ?foe.state = 33 & foe.time = 24
       // block big attack
-      shield_block()
-    auto_melee_boss()
+      return shield_block()
   :?foe = phase2
     // just match elements
     disable_steal = true
-    auto_melee_boss()
   :?foe = phase3
     ?foe.state = 32 & foe.time > 90
       // prepare for attack
-      shield_block()
+      return shield_block()
     :?foe.state = 115
       ?foe.time = 60
         // dodge the orb ray
@@ -739,10 +713,10 @@ func fight_dysan()
         disable_dash = true
     :?foe.state = 106 | foe.state = 108 |
     ^foe.state = 0
-      shield_block()
+      return shield_block()
     :?foe.state = 107 | foe.state = 32
       disable_steal = true
-    auto_melee_boss()
+  auto_melee_boss()
 
 func fight_xyloalgia()
   ?foe = phase1
@@ -751,11 +725,10 @@ func fight_xyloalgia()
   // Poena
   disable_steal = true
   ?foe_buffs = mirror
-    shield_block_and_halt()
+    return shield_block_and_halt() // WHAT
   :?foe.state = 32 & foe.time = 41
-    shield_block()
-  :
-    auto_melee_boss()
+    return shield_block()
+  auto_melee_boss()
 
 func fight_bolesh()
   // Get close, debuff/use abilities, then
@@ -764,7 +737,7 @@ func fight_bolesh()
   ?loc.stars > 5
     disable_steal = true
   ?foe.state = 133 &
-  ^(foe.time > 12 & foe.time < 18)
+  ^(foe.time > 14 & foe.time < 17)
     // block bite and don't move from ranged
     return shield_block_and_halt()
   :?foe.state = 142 & foe.time > 53
@@ -774,10 +747,9 @@ func fight_bolesh()
   ^(foe_ehp < edmg(smite_damage))
     ?come_closer()
       return true
-    :
-      equip @blade@
-  :?mindCD <= 0 &
-  ^foe_buffs ! "spider_buff_damage"
+    equip @blade@
+    return
+  :?mindCD<=0 & foe_buffs ! "spider_buff_damage"
     return auto_melee_boss()
   :?mindCD <= 0 & foe_dist < 10
     return backflip()
@@ -790,7 +762,7 @@ func try_evade()
 
 func fight_mushrooms()
   disable_steal = true
-  ?ability_lock = "shrooms"
+  ?string.Equals(ability_lock, "shrooms")
     ability_lock = false
   ?foe = phase1
     ?foe.state = 32 & foe.time = 48
@@ -801,13 +773,11 @@ func fight_mushrooms()
       // prevent interrupts
       lock_abilities("shrooms")
     :?foe.state = 33
-      // V = 1 frame / sec
+      // pellets, V = 1 frame / sec
       ?foe.time = foe_dist + 4
-        // pellets
         return shield_block()
-      :
-        // prevent interrupts
-        lock_abilities("shrooms")
+      // prevent interrupts
+      lock_abilities("shrooms")
   :?foe = mushroom_boss_fat
     ?loc.stars < 11
       big_swing = 56
@@ -822,51 +792,42 @@ func fight_mushrooms()
         // prevent interrupts
         lock_abilities("shrooms")
     :
-      auto_melee_boss()
-    // TODO detect pellets
+      // TODO detect pellets
+      return auto_melee_boss()
   : // Enoki themself
-    ?eff_dist > 6
-      ?!come_closer()
-        melee("def")
-    :
-      auto_melee_boss()
     // TODO detect pellets
+    ?eff_dist > 6 & !come_closer()
+      return melee("def")
   auto_melee_boss()
 
-func fight_pallas()
+func fight_pallas() // REDO
   at_boss = true
   disable_steal = true
   ?foe.count > 2
     ?foe_dist < 15 & mindCD <= 0
-      backflip()
-    :
-      elemental_aoe()
-  :
-    auto_melee_boss()
+      return backflip()
+    return elemental_aoe()
+  auto_melee_boss()
 
-func fight_bronze_guardian()
+func fight_bronze_guardian() // TIMINGS
   disable_steal = true
   ?foe.state = 32 & foe.time = 30
-    backflip() // dodge the hammer
-  :?foe.state = 33
-    // hammer is down
+    return backflip() // dodge the hammer
+  ?foe.state = 33 // hammer is down
     ?!use_abilities()
       melee("dps") // don't bother debuffing
-  :?foe_dist > 15 & foe.state = 2
+  :
     ranged()
 
-func fight_hrimnir()
+func fight_hrimnir() // REDO
   at_boss = true
   ?is_boss & foe.armor > 0
-    // initial ice block
-    ?should_slap()
-      slap() // get free evade stacks
-    :
-      melee("dps") // don't debuff
+    // initial ice block, don't debuff
+    return auto_melee()
   :?loc.stars <= 5 // try to cheese
     ?foe_dist <= 2
       ?!use_abilities()
-        melee("dps") // don't debuff
+        return auto_melee() // don't debuff
     :?foe_dist <= 5
       // The shovel has an attack range of 1
       // so at white stars we can avoid
@@ -875,32 +836,28 @@ func fight_hrimnir()
       // immediately
       equip shovel
     : // blown away, get back
-      auto_melee()
+      return auto_melee()
   :?foe.state = 143 | foe.state = 144 // blowing
-    ranged()
+    return ranged()
   :?foe.count > 1 // deal with adds
-    ?slowed // don't waste time on movement
-      ?range < 7
-        auto_melee()
-      :?foe.count > 2
-        elemental_aoe()
-      :
-        ranged()
-    :?can_smite()
-      smite()
-    :?can_bard() & foe = ice_wall
-      bardiche()
-    :?foe.count > 2 // elementals
-      melee("aoe")
-    :
-      auto_melee() // ice wall
+    ?can_smite()
+      return smite()
+    :?foe.count > 2
+      ?can_hammer()
+        return hammer()
+      return elemental_aoe()
+    :?eff_dist < 11
+      return auto_melee()
+    :?can_bard() & foe.id = ice_wall
+      return bardiche()
+    return auto_melee()
   :?slowed
-    // don't waste time on movement
     ranged()
   :
     auto_melee_boss()
 
-func fight_nagajara()
+func fight_nagaraja()
+  // TODO: dodge boulder
   disable_steal = true
   // goal is to dodge poison balls
   var x = screen.FromWorldX(pos.x)
@@ -1002,14 +959,7 @@ var dmg_debuffs = [
 var slow_debuffs = [
   "debuff_chill", "debuff_move_speed"
 ]
-var stun_debuff = "stun"
-var max_chill_s = "❄:debuff_chill:" + 
-^max_chill + ":"
-var foe_poisoned = "∞:debuff_damage:1:"
-var foe_on_fire = "φ:debuff_dot:1:"
-var disable_debuff = "buff_protection"
 var mirror = "poena_mirror"
-var pickpocket_buff = "pick_pocket"
 
 // global vars below
 // misc
@@ -1022,6 +972,7 @@ var low_hp = false // hp < (maxhp * threshold)
 var dmg_down_stacks = 0 // poison
 var range_down_stacks = 0
 var pickpocket_stacks = 0 // pickpocket buff
+var smitten = false // have smite buff
 var slowed = false // is player slowed
 var stunned = false // is player stunned
 var berserk = false // berserk potion TODO
@@ -1182,7 +1133,7 @@ func get_equipment(ty, debuff)
   return false
 
 func disambiguate_type(ty, only_one)
-  ?ty = "melee"
+  ?string.Equals(ty, "melee")
     var arr
     ?foe.armor > 0
       arr = melee_aa_weapons
@@ -1200,9 +1151,7 @@ var melee_aa_weapons = [
   "warhammer", "sword", "big sword"
 ]
 func get_elem_equipment(ty, elem, debuff)
-  found = false
-  var arr
-  ?ty = "melee"
+  ?string.Equals(ty, "melee")
     for tt : disambiguate_type("melee", false)
       found = get_item(tt, elem, debuff)
       ?found
@@ -1274,6 +1223,7 @@ func parse_statuses()
   slowed = false
   berserk = false
   stunned = false
+  smitten = false
   for s : [buffs.string, debuffs.string]
     // format: *:name:count:duration,...
     var splt = string.Split(s, ":", ",", false)
@@ -1292,30 +1242,27 @@ func parse_statuses()
           range_down_stacks = st_amount
         :?slow_debuffs.IndexOf(st_uid) ! -1
           slowed = true
-        :?string.Equals(st_uid, stun_debuff)
+        :?string.Equals(st_uid, "stun")
           stunned = true
-        :?string.Equals(st_uid, pickpocket_buff)
+        :?string.Equals(st_uid, "smite")
+          smitten = true
+        :?string.Equals(st_uid, "pick_pocket")
           pickpocket_stacks = st_amount
-
         var idx = status_uids.IndexOf(st_uid)
         ?idx ! -1
           var st_info = statuses[idx]
           var st_dur = int.Parse(splt[i+2])
-
           var st_s = string.Format("{0}({1}) " + 
           ^"{2}", st_info[1], st_amount,
           ^time.FormatDigital(st_dur))
-
           ?st_info[2] = "+"
             st_good.Add(st_s)
           :
             st_bad.Add(st_s)
-
         :?ignore_st.IndexOf(st_uid) = -1 &
         ^st_x.IndexOf(st_uid) = -1
           // log unknown statuses for debug
           st_x.Add(st_uid)
-
         i = i + 3
 
 func track_hits()
@@ -1394,8 +1341,7 @@ func prelude()
   :?loc = mine | foe = fire
     _elems = ["aether", "ice", "poison", "vigor"]
   :?loc = ridge | foe = ice
-    _elems = ["fire", "aether", 
-    "poison", "vigor"]
+    _elems = ["fire", "aether","poison", "vigor"]
   :?loc = caves | loc = temple | foe = poison
     _elems = ["ice", "aether", "fire", "vigor"]
   :?loc = mushroom | foe = vigor
@@ -1403,10 +1349,12 @@ func prelude()
   :
     _elems = ["default", "vigor", "aether", 
     "fire", "ice", "poison"]
+
 func dbg(e)
   ?ui_show_debug
     ?errors.IndexOf(e) = -1
       errors.Add(e)
+
 func draw_ui()
   var sy = 22
   ?ui_show_debug
@@ -1475,14 +1423,17 @@ func draw_ui()
     for err : errors
       >`20,@ey@,#red,@err@
       ey++
+
 func colorize(cd, allowed)
   ?cd > 0
     return "red"
   ?!allowed
     return "FE6800"
   return "green"
+
 func brew_pot()
   brew tar + bronze // vampiric
+
 func reset_loop()
   ability_lock = false
   at_boss = false
@@ -1490,24 +1441,22 @@ func reset_loop()
   cache.Clear()
   st_x.Clear()
 
-func test()
-  _elems = ["ice", "aether", "fire", "vigor"]
-  found = get_equipment("melee", false)
-  dbg("ice melee 1: " + found)
-  _main_hand = found
-  found = get_equipment("melee", false)
-  dbg("ice melee 2: " + found)
-  _main_hand = false
-  found = maybe_healing_equipment("melee")
-  dbg("ice melee 3: " + found)
-  _main_hand = found
-  found = maybe_healing_equipment("melee")
-  dbg("ice melee 4: " + found)
+// func test()
+//   _elems = ["ice", "aether", "fire", "vigor"]
+//   found = get_equipment("melee", false)
+//   dbg("ice melee 1: " + found)
+//   _main_hand = found
+//   found = get_equipment("melee", false)
+//   dbg("ice melee 2: " + found)
+//   _main_hand = false
+//   found = maybe_healing_equipment("melee")
+//   dbg("ice melee 3: " + found)
+//   _main_hand = found
+//   found = maybe_healing_equipment("melee")
+//   dbg("ice melee 4: " + found)
 
 ?loc.begin
   enable_hit_tracking = false
-  ?loc = halls
-    prefer_ranged = true
   _fill_status_uids()
   _fill_items_cache()
   ?item.potion = empty
@@ -1519,7 +1468,6 @@ func test()
   progress()
 :
   idle()
-test()
+// test()
 draw_ui()
-loc.Pause()
-//1
+// loc.Pause()
