@@ -713,7 +713,7 @@ func can_bard()
 
 // bardiche
 func should_bard()
-  return can_bard()
+  return is_boss & can_bard()
 
 // bardiche
 func bardiche()
