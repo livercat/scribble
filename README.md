@@ -39,8 +39,58 @@ something
 ^like
 ^this
 ```
+Some variable names are shorter than I would prefer for readability, but Mindstone has line limit of 49 chars (actually it might be 48, need to check).
+
+I use a mix of function arguments and global variables for various pieces of logic. I would prefer not to use global vars at all 
+to make it harder to miss something and easier to follow the logic, but since we don't have optional or default arguments,
+functions would have very ugly signatures. So func argument are used for weapon switching where it's important to make sure everything
+lines up correctly.
+
+I also use a mix of conditional branching (:?) and early returns. Early returns reduce line lenght and make funcs more readable. They are neat!
+
+Main logic is in following functions:
+prelude() - collects info from game state
+  into global vars
+progress() - entry point for combat logic
+  and boss handling
+fight() - main logic for choosing range and
+  fighting special non-boss enemies
+melee(), ranged(), elemental() - equip
+  appropriate weapons
+draw_ui() - draws UI :)
 
 If you also play on mobile, please don't use in-game UI to write your code! It's fine for small adjustments, but for writing actual logic it's very inconvenient. Use a mobile programming editor, or even basic text editor/notes app, it will make your life less painful.
+
+## Notes on weapon naming
+
+Each elemental weapon aside from staffs and warhammers has two variants: "D" or "dX",
+where "X" is the elemental modifier ("A" and "ax" for shields). Staffs and warhammers instead have six!
+
+"A", "D", "ax", "aX", "dx", "dX".
+
+You can mutate between them using moondial.
+
+Meaning of letters in suffix:
+"A": get armor on egage for each foe
+"D": attack bonus vs correct element
+"x": on being hit, chance to: unmake (aether),
+     fire dot, chill (ice), +attack (poison),
+     heal (vigor)
+"X": on attack, chance to: unmake (aether),
+     fire dot, chill (ice), lifesteal (vigor),
+     reduce foe attack (poison)
+
+Full list of suffixes:
+Defensive: staffs, warhammers, shields
+  "au", "af", "ai", "ap", "ah", "A"
+Offensive: staffs, warhammers, swords, xbows
+  "dU", "dF", "dI", "dP", "dL", "D"
+Exclusive to staffs and warhammers:
+  "aU", "aF", "aI", "aP", "aL",
+  "du", "df", "di", "dp", "dh"
+
+Note that vigor has 2 different letters: "L" for offensive lifesteal and "h" for defensive "heal on being hit".
+There are no "l" or "H" modifiers.
 
 ## Screenshot
 

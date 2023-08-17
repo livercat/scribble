@@ -1,3 +1,10 @@
+Version 1.2.1
+  - Fixed weapon switcher not respecting
+    default weapons in many cases
+  - Added limited support for one more Mask quest
+  - Moved a lot of unnecessary comments from the 
+    script to the readme
+
 Version 1.2
  - Majorer reorganization and clean up!
  - Weapons are much easier to configure 
