@@ -238,7 +238,6 @@ func progress()
   :
     // unknown boss
     dbg("Fighting unknown boss")
-    loc.Pause()
     auto_melee_boss()
 
 func idle()
