@@ -514,7 +514,7 @@ func should_qs_dash()
 
 func qs_dash()
   stance = "staff-dashing"
-  equip_L("staff")
+  equip_L("quarterstaff")
   ?item.CanActivate("quarterstaff")
     activate R
   return true
