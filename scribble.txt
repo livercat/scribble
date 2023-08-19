@@ -1,6 +1,6 @@
 // hammer, war hammer, warhammer are the same
 var elemental_items = [
-  ["warhammer", 
+["warhammer", 
     ["aether", "D"],
     ["poison", "D"],
     ["ice", "D"],
@@ -11,7 +11,7 @@ var elemental_items = [
     ["vigor", "D", "dL"],
   ],
   ["sword", 
-    ["aether", "D"],
+["aether", "D"],
     ["fire", "dF"],
     ["ice", "dI"],
     ["poison", "dP", "D"],
@@ -23,7 +23,7 @@ var elemental_items = [
     ["poison", "A"],
     ["ice", "A"],
     ["aether", "A"],
-    ["default", "vigor shield ah"],
+     ["default", "vigor shield ah"],
   ],
 ]
 
@@ -495,13 +495,15 @@ func clear_lock(tag)
     lock_timer = 0
 
 func available(ability)
+  var idx = can_use_abilities.IndexOf(ability)
+  ?idx = -1
+    return false
   ?lock
     ?string.Equals(lock, ability)
       return lock_timer > 0 // animation
     :
       return false
-  return can_use[
-  ^can_use_abilities.IndexOf(ability)]
+  return can_use[idx]
 
 func can_qs_dash()
   return available("quarterstaff") & 
@@ -593,7 +595,7 @@ func can_bard()
 func should_bard()
   return is_boss & can_bard()
 
-var bard_frames = 20
+var bard_frames = 30
 func bardiche()
   set_lock("bardiche", bard_frames)
   stance = "bardiche R"
@@ -1217,6 +1219,7 @@ func _prepare_ranges()
     ranged_aoe_range = 
     ^_weapon_range(ranged_aoe_types[0])
 
+var abilities_count = 0
 var cooldowns = []
 var can_use = []
 func _prepare_abilities()
@@ -1225,12 +1228,11 @@ func _prepare_abilities()
   for r : can_use_abilities
     cooldowns.Add(0)
     can_use.Add(false)
+  abilities_count = can_use_abilities.Count()-1
 
-// no -1 because we added "mind"
-var skill_count = can_use_abilities.Count()
 var can_mind = false
 func _maintain_abilities()
-  for i = 0 .. skill_count
+  for i = 0 .. abilities_count
     var r = can_use_abilities[i]
     cooldowns[i] = item.GetCooldown(r)
     can_use[i] = cooldowns[i] <= 0
