@@ -1,6 +1,6 @@
 // hammer, war hammer, warhammer are the same
 var elemental_items = [
-["warhammer", 
+  ["warhammer", 
     ["aether", "D"],
     ["poison", "D"],
     ["ice", "D"],
@@ -11,7 +11,7 @@ var elemental_items = [
     ["vigor", "D", "dL"],
   ],
   ["sword", 
-["aether", "D"],
+    ["aether", "D"],
     ["fire", "dF"],
     ["ice", "dI"],
     ["poison", "dP", "D"],
@@ -23,7 +23,7 @@ var elemental_items = [
     ["poison", "A"],
     ["ice", "A"],
     ["aether", "A"],
-     ["default", "vigor shield ah"],
+    ["default", "vigor shield ah"],
   ],
 ]
 
@@ -199,7 +199,7 @@ func healwalk()
 func avoid_explosion()
   stance = "avoiding explosion"
   ?foe_dist < 5
-    disable_r("all_dash")
+    disable_r("any_dash")
     return try_evade()
   return melee("def")
 
@@ -246,7 +246,7 @@ func melee(mode)
     stance = "melee aoe"
     auto_equip("melee", true)
   ?mode = "def" | 
-  ^eff_dist > _weapon_range(_equip_L)
+  ^eff_dist > get(weapon_ranges, _equip_L)
     stance = "melee def"
     found = auto_equip_L("melee", false)
     ?!is_2hander(found)
@@ -340,21 +340,17 @@ func auto_melee_miniboss()
 /**********************
 ** #Weapon switching **
 **********************/
+
 func debuff()
-  ?foe_buffs = "buff_protection" | 
-  ^foe_buffs = mirror
+  ?foe.buffs.string = "poena_mirror" | 
+  ^foe_debuffs.Contains("buff_protection")
     return false
   cache.Clear()
-  ?!(foe_debuffs = "∞:debuff_damage:") &
-  ^!(foe = immune_to_debuff_damage)
+  ?can_be_debuffed("debuff_damage")
     cache.Add("poison")
-  ?!(foe_debuffs = "φ:debuff_dot:") &
-  ^!(foe = immune_to_debuff_dot)
+  ?can_be_debuffed("debuff_dot")
     cache.Add("fire")
-  ?!dont_chill & 
-  ^!(foe_debuffs = "❄:debuff_chill:" + 
-  ^max_chill + ":") &
-  ^!(foe = immune_to_debuff_chill)
+  ?can_be_debuffed("debuff_chill")
     cache.Add("ice")
   var amount = cache.Count()
   ?amount = 0
@@ -688,8 +684,8 @@ func fight_scout()
     equip_L("quest")
     ?foe_s = 32 & foe_t > 11 & can_mask()
       return mask()
-    ?get_cd("mask") > 0 &
-    ^foe_debuffs ! "debuff_feeble"
+    ?get_cd("mask") > 0 & 
+    ^!foe_debuffs.Contains("debuff_feeble")
       return loc.Leave()
     ?have_dashing
       equip_R("dashing")
@@ -714,7 +710,7 @@ func fight_dysan() // REDO
         return backflip()
       :?foe_t < 80
         // don't dash into ray
-        disable_r("all_dash")
+        disable_r("any_dash")
     :?foe_s = 106 | foe_s = 108 |
     ^foe_s = 0
       return shield_block()
@@ -725,7 +721,7 @@ func fight_xyloalgia()
     return auto_melee_boss()
   // Poena
   disable_r("skeleton_arm")
-  ?foe_buffs = mirror
+  ?foe.buffs.string = "poena_mirror"
     return shield_block_and_halt() // :(
   :?foe_s = 32 & foe_t = 41
     return shield_block()
@@ -744,7 +740,8 @@ func fight_bolesh()
   :?foe_s = 142 & foe_t = 60
     // evade melee bite
     return backflip()
-  :?can_mind & foe_buffs ! "spider_buff_damage"
+  :?can_mind & 
+  ^!(foe.buffs.string = "spider_buff_damage")
     return auto_melee_boss()
   :?bfg_quest & bfg_quest = "bolesh" & 
   ^(foe_ehp < edmg(smite_damage))
@@ -755,30 +752,24 @@ func fight_bolesh()
     ranged()
 
 func fight_mushrooms()
-  /* big swing timings are affected by chill,
-  so don't chill before the 1st swing, and nuke
-  and chill after that */
   disable_r("skeleton_arm")
-  dont_chill = false
+  var chill_stacks
+  var idx = foe_debuffs.IndexOf("debuff_chill")
+  ?idx ! -1
+    chill_stacks = foe_debuffs[idx + 1]
+  :
+    chill_stacks = 0
   ?foe = phase1
-    big_swing = 48
-    ?!swing_evaded
-      dont_chill = true
-    ?foe.hp < 100
-      swing_evaded = false //reset before phase2
-    ?!swing_evaded & foe_s = 32 &
-    ^evade_at(big_swing)
-      swing_evaded = true
+    // thanks user fruloo from the discord!
+    big_swing = 47 + 7 * chill_stacks
+    ?foe_s = 32 & evade_at(big_swing)
       return
     :?foe_s = 33 & foe_t = foe_dist + 4
       // pellets, V = 1 frame / sec
       return shield_block()
   :?foe = mushroom_boss_fat
-    big_swing = 27
-    ?!swing_evaded
-      dont_chill = true
+    big_swing = 26 + 7 * chill_stacks
     ?foe_s = 32 & evade_at(big_swing)
-      swing_evaded = true
       return
   auto_melee_boss()
 
@@ -889,10 +880,7 @@ func _detect_poison()
 **     #Internals   **
 *********************/
 var at_boss = false // to disable default fight
- // mushrooms
-var big_swing = 0
-var swing_evaded = false
-var dont_chill = false
+var big_swing = 0 // mushrooms
 // player status
 var stance = "unknown" // chosen combat stance
 var low_hp = false // hp < (maxhp * threshold)
@@ -908,19 +896,12 @@ var can_aoe = false
 var lock = false
 var lock_timer = false
 var free_mind = false
-var all_abilities = [
-  "mind", "hammer", "bardiche", "blade",
-  "skeleton_arm", "dash", "bash", "mask", 
-  "quarterstaff", 
-]
 // foe status
 var foe_s = 0 // foe.state
 var foe_t = 0 // foe.time
 var foe_ehp = 0 // foe.armor + foe.hp
 var foe_dist = 0 // foe_dist
 var eff_dist = 0 // foe_dist + range_debuff
-var foe_buffs = "" // foe.buffs.string
-var foe_debuffs = "" // foe.debuffs.string
 var is_boss = false // foe = boss
 var phys_immune = false // immune to physical
 // hit tracking
@@ -942,8 +923,8 @@ var ty = false
 var _equip_L = false
 var _equip_R = false
 var _elems = ["default"]
-var st_good = [] // current buffs
-var st_bad = [] // current debuffs
+var my_buffs = [] // current buffs
+var my_debuffs = [] // current debuffs
 var st_x = [] // unknown status effects
 var status_uids = []
 var errors = []
@@ -1075,7 +1056,7 @@ func get_item(ty, element, elem_effect)
     found = _find_first(slot[1], _equip_L)
   return found
 
-var ignore_st = [ // irrelevant statuses
+var ignore_statuses = [
   "quarterstaff_buff_attack_speed",
   "quarterstaff_buff_stun",
   "bardiche_buff_aoe_chance",
@@ -1083,7 +1064,7 @@ var ignore_st = [ // irrelevant statuses
   "bardiche_buff_crit_mult",
   "bardiche_buff_move_speed",
 ]
-var statuses = [
+var all_statuses = [
   ["berserk", "Berserk", "+"], 
   ["smite", "Smite", "+"], 
   ["pick_pocket", "Pickpocket", "+"],
@@ -1103,24 +1084,13 @@ var statuses = [
   ["pallas_phase2_debuff", "RangeDown", "-"],
   ["debuff_dot", "FireDoT", "-"],
 ]
-var dmg_debuffs = [
-  "debuff_damage", "debuff_duration_damage",
-  "spider_debuff_damage", "puff_debuff_damage"
-]
-var slow_debuffs = [
-  "debuff_chill", "debuff_move_speed"
-]
-var mirror = "poena_mirror"
-func _parse_statuses()
-  st_good.Clear()
-  st_bad.Clear()
-  dmg_down_stacks = 0
-  range_down_stacks = 0
-  pickpocket_stacks = 0
-  slowed = false
-  berserk = false
-  stunned = false
-  smitten = false
+func _prepare_statuses()
+  for info : all_statuses
+    status_uids.Add(info[0])
+
+func _update_statuses()
+  my_buffs.Clear()
+  my_debuffs.Clear()
   for s : [buffs.string, debuffs.string]
     // format: *:name:count:duration,...
     var splt = string.Split(s, ":", ",", false)
@@ -1128,44 +1098,96 @@ func _parse_statuses()
     ?arr_size > 0
       // iterate over names (2nd field)
       for i = 1 .. arr_size - 3
-        var st_uid = splt[i]
-        var st_amount = int.Parse(splt[i+1])
-        var st_dur = int.Parse(splt[i+2])
-        ?dmg_debuffs.Contains(st_uid)
-          dmg_down_stacks = dmg_down_stacks + 
-          ^st_amount
-        :?slow_debuffs.Contains(st_uid)
-          slowed = true
-        :?string.Equals(st_uid, 
-        ^"pallas_phase2_debuff")
-          range_down_stacks = st_amount
-        :?string.Equals(st_uid, "stun")
-          stunned = st_dur
-        :?string.Equals(st_uid, "smite")
-          smitten = true
-        :?string.Equals(st_uid, "berserk")
-          berserk = true
-        :?string.Equals(st_uid, "pick_pocket")
-          pickpocket_stacks = st_amount
-        var idx = status_uids.IndexOf(st_uid)
-        ?idx ! -1
-          var st_info = statuses[idx]
-          var st_s = string.Format("{0}({1}) " + 
-          ^"{2}", st_info[1], st_amount,
-          ^time.FormatDigital(st_dur))
-          ?st_info[2] = "+"
-            st_good.Add(st_s)
-          :
-            st_bad.Add(st_s)
-        :?!ignore_st.Contains(st_uid) &
-        ^!st_x.Contains(st_uid)
-          // log unknown statuses for debug
-          st_x.Add(st_uid)
+        _parse_statuses(splt, i)
         i = i + 3
 
-func _prepare_statuses()
-  for st_info : statuses
-    status_uids.Add(st_info[0])
+var dmg_debuffs = [
+  "debuff_damage", "debuff_duration_damage",
+  "spider_debuff_damage", "puff_debuff_damage"
+]
+var slow_debuffs = [
+  "debuff_chill", "debuff_move_speed"
+]
+var my_statuses = ["stun", 0, "damage_down", 0,
+"slow", false, "berserk", false, "smite",
+false, "range_down", false, "pickpocket", 0,
+]
+var buff_template = "{0}({1}) {2}"
+func _parse_statuses(splt, i)
+  var uid = splt[i]
+  var idx = status_uids.IndexOf(uid)
+  ?idx = -1
+    ?!ignore_statuses.Contains(uid) &
+    ^!st_x.Contains(uid)
+      st_x.Add(uid)
+    return
+  var info = all_statuses[idx] // uid, name, +/-
+  var num = int.Parse(splt[i+1])
+  var dur = int.Parse(splt[i+2])
+  var _name = string.Format(buff_template, 
+  ^info[1], num, time.FormatDigital(dur))
+  ?info[2] = "+"
+    my_buffs.Add(_name)
+  :
+    my_debuffs.Add(_name)
+  ?dmg_debuffs.Contains(uid)
+    my_statuses["damage_down"] = 
+    ^my_statuses["damage_down"] + num
+  :?slow_debuffs.Contains(uid)
+    my_statuses["slow"] = 
+    ^my_statuses["damage_down"] + num
+    slowed = true
+  :?string.Equals(uid, "pallas_phase2_debuff")
+    range_down_stacks = num
+  :?string.Equals(uid, "stun")
+    stunned = dur
+  :?string.Equals(uid, "smite")
+    smitten = true
+  :?string.Equals(uid, "berserk")
+    berserk = true
+  :?string.Equals(uid, "pick_pocket")
+    pickpocket_stacks = num
+
+var foe_debuffs = ["debuff_damage", false,
+"debuff_dot", false, "debuff_feeble", false, 
+"buff_protection", false, "stun", 0, 
+"debuff_chill", 0]
+func _update_foe_debuffs()
+  foe_debuffs["debuff_chill"] = 0
+  foe_debuffs["stun"] = 0
+  for i = 1 .. foe_debuffs.Count() - 5
+    foe_debuffs[i] = false
+    i++
+  var splt = string.Split(foe.debuffs.string,
+  ^":", ",", false)
+  var arr_size = splt.Count()
+  ?arr_size = 0
+    return
+  for i = 1 .. arr_size - 3
+    var uid = splt[i]
+    var idx = foe_debuffs.IndexOf(uid)
+    ?idx ! -1
+      ?!debuffs_non_bool.Contains(uid)
+        foe_debuffs[idx + 1] = true
+      :?string.Equals(uid, "debuff_chill")
+        foe_debuffs[idx+1]=int.Parse(splt[i+1])
+      :?string.Equals(uid, "stun")
+        foe_debuffs[idx+1]=int.Parse(splt[i+2])
+  
+func get_foe_debuff(debuff_uid)
+  var idx = foe_debuffs.IndexOf(debuff_uid)
+  ?idx = -1
+    return false
+  return foe_debuffs[idx + 1]
+
+func can_be_debuffed(buff_uid)
+  ?(foe = "immune_to_" + buff_uid)
+    return false
+  ?buff_uid = "debuff_chill"
+    return get_foe_debuff(debuff_uid)< max_chill
+  :?buff_uid = "stun"
+    return get_foe_debuff(debuff_uid) = 0
+  return !get_foe_debuff(debuff_uid)
 
 func get_foe_elems()
   ?foe = aether
@@ -1180,7 +1202,7 @@ func get_foe_elems()
     return ["vigor", "poison"]
   return ["", false]
 
-func _set_elems()
+func _update_elems()
   _elems.Clear()
   var foe_elems = get_foe_elems() // strong,weak
   ?low_hp
@@ -1199,62 +1221,65 @@ var weapon_ranges = ["sword", 5, "hammer", 5,
 "heavy hammer", 7, "bardiche", 9, "staff", 10,
 "blade", 11, "wand", 20, "heavy crossbow", 22,
 "repeating", 22, "crossbow", 22]
-func _weapon_range(weapon)
-  var idx = weapon_ranges.IndexOf(weapon)
-  ?idx = -1
-    return 5
-  return weapon_ranges[idx + 1]
-
 var melee_range = 5
 var melee_aoe_range = 5
 var ranged_aoe_range = 16
 func _prepare_ranges()
   ?melee_types.Count() > 0
-    melee_range = 
-    ^_weapon_range(melee_types[0])
+    melee_range = get(weapon_ranges, 
+    ^melee_types[0])
   ?melee_aoe_types.Count() > 0
-    melee_aoe_range = 
-    ^_weapon_range(melee_aoe_types[0])
+    melee_aoe_range = get(weapon_ranges, 
+    ^melee_aoe_types[0])
   ?ranged_aoe_types.Count() > 0
-    ranged_aoe_range = 
-    ^_weapon_range(ranged_aoe_types[0])
+    ranged_aoe_range = get(weapon_ranges, 
+    ^ranged_aoe_types[0])
 
-var abilities_count = 0
-var cooldowns = []
-var can_use = []
+var all_abilities = [
+  "mind", "hammer", "bardiche", "blade",
+  "skeleton_arm", "mask", "quarterstaff", 
+  "dash", "bash",
+]
+var abilities = ["mind", 0, false, ]
 func _prepare_abilities()
-  ?!can_use_abilities.Contains("mind")
-    can_use_abilities.Add("mind")
   for r : can_use_abilities
-    cooldowns.Add(0)
-    can_use.Add(false)
-  abilities_count = can_use_abilities.Count()-1
+    ?!abilities.Contains(r)
+      abilities.Add(r)
+      abilities.Add(0)
+      abilities.Add(false)
 
 var can_mind = false
-func _maintain_abilities()
-  for i = 0 .. abilities_count
-    var r = can_use_abilities[i]
-    cooldowns[i] = item.GetCooldown(r)
-    can_use[i] = cooldowns[i] <= 0
+func _update_abilities()
+  for i = 0 .. abilities.Count() - 3
+    var r = abilities[i]
+    abilities[i + 1] = item.GetCooldown(r)
+    abilities[i + 2] = abilities[i + 1] <= 0
     ?string.Equals(r, "mind")
-      can_mind = can_use[i]
+      can_mind = abilities[i + 2]
+    i = i + 2
 
 func get_cd(ability)
-  return 
-  ^cooldowns[can_use_abilities.IndexOf(ability)]
+  return _get(abilities, ability)
 
 var move_r = ["quarterstaff", "bash", "dash"]
 func disable_r(ability)
-  ?ability = "all_dash"
+  ?ability = "any_dash"
     for a : move_r
-      can_use[can_use_abilities.IndexOf(a)] = 
+      abilities[abilities.IndexOf(a) + 2] = 
       ^false
     return
-  can_use[can_use_abilities.IndexOf(ability)] =
+  abilities[abilities.IndexOf(ability) + 2] =
   ^false
 
-func _maintain_lock()
-  ?stunned
+func _get(dict, k)
+  var idx = dict.IndexOf(k)
+  ?idx = -1
+    >`20,5,#red,Bad dict key: k=@k@
+    loc.Pause()
+  return dict[idx + 1]
+
+func _update_lock()
+  ?-----("stun") > 0
     set_lock("stun", stunned)
   :
     clear_lock("stun")
@@ -1264,17 +1289,18 @@ func _maintain_lock()
     :
       lock_timer--
   :
-    lock_timer = 0  
+    lock_timer = 0
 
 func prelude()
   // reset/update dynamic global vars
   ?enable_hit_tracking
     track_hits()
-  _parse_statuses()
-  _maintain_abilities()
-  _maintain_lock()
+  _update_statuses()
+  _update_foe_debuffs()
+  _update_abilities()
+  _update_lock()
   low_hp = hp < (maxhp * low_hp_threshold)
-  _set_elems() // needs to know `low_hp`
+  _update_elems() // needs to know `low_hp`
   _equip_L = false
   _equip_R = false
   stance = "unknown"
@@ -1283,8 +1309,6 @@ func prelude()
   foe_ehp = foe.armor + foe.hp
   foe_dist = foe.distance  
   eff_dist = foe_dist + range_down_stacks
-  foe_buffs = foe.buffs.string
-  foe_debuffs = foe.debuffs.string
   is_boss = (foe = boss)
   phys_immune = (foe = immune_to_physical)
   can_aoe = (foe.count >= aoe_treshold)
@@ -1329,16 +1353,16 @@ func draw_ui()
     y = 20
   ?ui_show_statuses
     >`@x@,@y@,#00A300,
-    ^+ @string.Join(", ", st_good)@
+    ^+ @string.Join(", ", my_buffs)@
     >`@x@,@y+1@,#FE6800,
-    ^- @string.Join(", ", st_bad)@
+    ^- @string.Join(", ", my_debuffs)@
     >`@x@,@y+2@,#F008B2,
     ^? @string.Join(", ", st_x)@
   ?ui_show_cd
     y = 6
     for r : all_abilities
       ?!move_r.Contains(r) & 
-      ^can_use_abilities.Contains(r)
+      ^abilities.Contains(r)
         var cd = get_cd(r)
         ?r = "skeleton_arm"
           r = "Arm"
@@ -1406,8 +1430,6 @@ func reset_loop()
   lock = false
   lock_timer = 0
   at_boss = false
-  swing_evaded = false
-  dont_chill = false
   cache.Clear()
   st_x.Clear()
   enable_hit_tracking = false
