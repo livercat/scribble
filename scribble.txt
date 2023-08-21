@@ -271,8 +271,8 @@ func fight()
     return ranged("single")
   :?foe = immune_to_ranged
     return auto_melee()
-  :?prefer_ranged_foe() 
-  ^& foe_dist > melee_aoe_range
+  :?prefer_ranged_foe() & can_aoe & 
+  ^foe_dist > melee_aoe_range
     return auto_ranged()
   :?prefer_ranged
     ?foe_dist < 8
