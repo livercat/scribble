@@ -6,7 +6,6 @@ var elemental_items = [
     ["ice", "D"],
   ],
   ["wand", 
-    ["poison", "D"],
     ["vigor", "D", "dL"],
   ],
   ["sword", 
@@ -72,9 +71,12 @@ to use ranged items from lists below instead of
 melee. */
 var prefer_ranged = false
 
-/* Used for scripted bosses, some special foes
-like ants and mosquitoes, or when 
-`prefer_ranged` is true. */
+/* Will prefer ranged only for these enemies */
+var ranged_foes = ["mosquito", "huge_mosquito",
+"wasp", "ant"]
+
+/* Used for scripted bosses, for `ranged_foes`,
+or when `prefer_ranged` is true. */
 var for_ranged_single_target = ["repeating"]
 
 /* Weapons to use for ranged AoE. Ranged AoE is
@@ -93,11 +95,11 @@ var evade_shield = "vigor ah"
 HP, will prioritize `ah` shield and `dL` weapon 
 over foe's elemental weakness.
 If 1, will always try to lifesteal to max.
-If -1, will never force lifesteal. */
-var low_hp_threshold = 0.5
+If 0, will never force lifesteal. */
+var low_hp_threshold = 1
 
 // Switch to 1h + shield when `low_hp_threshold`
-var use_shield_on_low_hp = true
+var use_shield_on_low_hp = false
 
 /* if true, will debuff even regular enemies
 when you have the Smite buff active. */
@@ -176,7 +178,7 @@ func progress()
   :?loc = deadwood
     return fight_xyloalgia()
   :?loc = caves
-    ?foe.id = "cool_bat" // ceiling decorator
+    ?foe.id = "cool_bat" // TODO stunlock
       return auto_melee_miniboss()
     return fight_bolesh()
   :?loc = fungus_forest_boss
@@ -186,6 +188,10 @@ func progress()
       return auto_melee_miniboss()
   :?loc = undead_crypt_boss
     return fight_pallas()
+  :?loc = halls
+    ranged("aoe")
+    stance = "miniboss " + stance
+    return
   :?loc = bronze_guardian
     return fight_bronze_guardian()
   :?loc = icy_ridge
@@ -193,7 +199,7 @@ func progress()
   :?loc = nagaraja
     return fight_nagaraja()
   :
-    dbg("Fighting unknown boss")
+    dbg("Fighting unknown boss: " + foe.id)
     auto_melee_boss()
 
 func healwalk()
@@ -242,6 +248,12 @@ func fight()
     return auto_ranged()
   :
     return auto_melee()
+
+func must_ranged_foe()
+  return ranged_foes.Contains(foe.id) 
+
+func must_melee_foe()
+  return foe = immune_to_ranged | foe = ranged
 
 func auto_melee()
   ?use_abilities()
@@ -332,15 +344,6 @@ func dash()
     return equip_R("dashing")
   return false
 
-var ranged_foes = ["mosquito", "huge_mosquito",
-"wasp", "ant"]
-func must_ranged_foe()
-  return ranged_foes.Contains(foe.id) 
-
-func must_melee_foe()
-  return foe = immune_to_ranged | foe = ranged | 
-  ^foe.id = "cult_guard" // poisons on being hit
-
 func auto_melee_boss()
   auto_melee()
   stance = "boss " + stance
@@ -411,7 +414,6 @@ func auto_equip_shield()
 func auto_equip_dps(range, aoe)
   found = select_dps_weapon(range, aoe)
   ?!found
-    panic("No DPS items found")
     return false
   equip_L(found)
   ?is_2hander(found_type)
@@ -629,14 +631,14 @@ func can_smite()
 
 func should_smite()
   ?bfg_quest = "variety"
-    ?foe_ehp<=edmg(smite_damage) & can_smite()
+    ?foe_ehp<=smite_damage & can_smite()
       for e : bfg_defeated_foes
         ?foe = e
           return false
       return true
     return false
   return (is_boss | foe.count >= smite_treshold
-  ^& foe_ehp<=edmg(smite_damage)) & can_smite()
+  ^& foe_ehp <= smite_damage) & can_smite()
 
 func smite()
   stance = "smite R"
@@ -650,9 +652,14 @@ func can_hammer()
   ^eff_dist <= 21 & can_activate()
 
 func should_hammer()
-  return (foe = spawner & can_aoe & eff_dist<10|
-  ^foe.armor>0 & (is_boss|can_aoe&eff_dist<10))& 
-  ^can_hammer()
+  ?!can_hammer()
+    return false
+  var should_stun = debuff_on_smite & 
+  ^get(my_statuses, "smite") & 
+  ^(foe ! immune_to_stun)
+
+  return (is_boss | can_aoe & eff_dist < 10) &
+  ^(foe = spawner | foe.armor > 0 | should_stun)
 
 var hammer_frames = 15
 func hammer()
@@ -723,7 +730,8 @@ func aac(weapon)
   _equip_L = weapon
   equip @weapon@
   ?ai.idle & 
-  ^!(weapon = "repeating" | weapon = "crossbow")
+  ^!(weapon = "repeating" | weapon = "crossbow"
+  ^| weapon = "staff")
     ?lock & (is_locked_by("hammer") | 
     ^is_locked_by("bardiche"))
       return false
@@ -759,11 +767,12 @@ func shield_block()
   ^equip_R(evade_shield)
 
 func shield_block_big_hit()
-  stance = "shield block and halt"
+  stance = "shield block big hit"
   return equip_L("quest")& equip_R(evade_shield)
 
 func fight_scout()
-  ?string.Equals(mask_quest, "prevent")
+  ?mask_quest & string.Equals(mask_quest, 
+  ^"prevent")
     equip_L("quest")
     ?foe_s = 32 & foe_t > 11 & can_mask()
       return mask()
@@ -773,7 +782,7 @@ func fight_scout()
     ?have_dashing
       equip_R("dashing")
   :
-    auto_melee_boss()    
+    auto_melee_miniboss()  
 
 func fight_dysan() // REDO
   disable_r("skeleton_arm")
@@ -801,8 +810,10 @@ func fight_dysan() // REDO
 
 func fight_xyloalgia()
   ?foe = phase1 // Xyloalgia
+    // TODO: root
     return auto_melee_boss()
   // Poena
+  // TODO: permastun
   disable_r("skeleton_arm")
   ?foe.buffs.string = "poena_mirror"
     return shield_block_big_hit() // :(
@@ -814,20 +825,21 @@ func fight_bolesh()
   // Get close, debuff/use abilities, then
   // jump to ranged before the first melee bite,
   // and continue shooting and blocking.
+  // TODO: potion
   ?loc.stars > 5
     disable_r("skeleton_arm")
   ?foe_s = 133 & ((foe_t > 9 & foe_t < 12) | 
   ^(foe_t > 14 & foe_t < 17))
     // block bite and don't move from ranged
     return shield_block_big_hit()
-  :?foe_s = 142 & foe_t = 60
+  :?foe_s = 142 & evade_at(60)
     // evade melee bite
-    return backflip()
+    return
   :?can_mind & 
   ^!(foe.buffs.string = "spider_buff_damage")
     return auto_melee_boss()
   :?bfg_quest & bfg_quest = "bolesh" & 
-  ^(foe_ehp < edmg(smite_damage))
+  ^(foe_ehp < smite_damage * 1.5)
     ?eff_dist <= 11
       return equip_L("blade")
     return melee("def")
@@ -864,8 +876,7 @@ func fight_pallas()
     ?foe_s = 32 & foe_t = 68
       return shield_block()
     return auto_melee_boss()
-  :?foe = phase2 & foe.count > 2 & 
-  ^for_phys_immune.Count() > 0
+  :?foe = phase2 & foe.count > 2
     return ranged("aoe") // deal with ghosts
   auto_melee_boss()
 
@@ -916,7 +927,7 @@ func fight_nagaraja()
   // dodge poison balls & plink away
   disable_r("skeleton_arm")
   ?foe_s = 112 & foe_t = 59 & foe_dist < 10
-    ?can_mind
+    ?can_mind // boulder
       naga_step = 0
       return backflip() // dodge back and repeat
     return shield_block() // try to block
@@ -979,18 +990,6 @@ var foe_dist = 0 // foe_dist
 var eff_dist = 0 // foe_dist + range_debuff
 var is_boss = false // foe = boss
 var phys_immune = false // immune to physical
-// hit tracking
-var enable_hit_tracking = false
-var last_frame_dist = 0
-var last_frame_armor = 0
-var last_frame_hp = 0
-var last_frame_foe = ""
-var last_frame_dist = 0
-var last_frame_state = -1
-var last_frame_time = -1
-var last_frame_stance = ""
-var last_frame_debuffs = 
-^"sl=false,st=false,d=false,r=false"
 
 var elem_types = [
   "sword", "big sword", "wand", "shield", 
@@ -1295,10 +1294,9 @@ func _prepare_ranges()
     ranged_range = get(weapon_ranges, a[0])
 
 func _update_lock()
+  clear_lock("stun")
   ?get(my_statuses, "stun")
     set_lock("stun", 0)
-  :
-    clear_lock("stun")
   ?lock
     ?lock_timer <= 0
       lock = false
@@ -1345,14 +1343,27 @@ func panic(e)
   >`20,5,#red,@e@
   loc.Pause()
 
-var debuff_hash = "sl={0},st={1},d={2},r={3}"
+var enable_hit_tracking = false
+var last_frame_dist = 0
+var last_frame_armor = 0
+var last_frame_hp = 0
+var last_frame_foe = ""
+var last_frame_dist = 0
+var last_frame_state = -1
+var last_frame_time = -1
+var last_frame_stance = ""
+var debuff_hash = "sl={0},st={1},d={2},r={3},
+^aspd={4}"
+var last_frame_debuffs = string.Format(
+^debuff_hash, false, false, 0, 0, 0)
 func track_hits()
   var hp_diff = last_frame_hp - hp
   var _debuffs = string.Format(debuff_hash,
   ^get(my_statuses, "slow"), 
   ^get(my_statuses, "stun"), 
-  ^get(my_statuses, "damage_down") > 0,
-  ^get(my_statuses, "range_down") > 0)
+  ^get(my_statuses, "damage_down"),
+  ^get(my_statuses, "range_down"),
+  ^get(my_statuses, "aspd_down"))
   ?hp_diff > 0 | 
   ^(last_frame_debuffs ! _debuffs)
     var y = 2
@@ -1450,7 +1461,6 @@ func draw_ui()
       ey++
 
 func colorize(cd)
-  // return "blue"
   ?cd > 0
     return "red"
   return "green"
@@ -1461,11 +1471,11 @@ func brew_pot()
 func reset_loop()
   lock = false
   lock_timer = 0
-  at_boss = false
   my_weird.Clear()
   enable_hit_tracking = false
+  // bosses
+  at_boss = false
   naga_step = 0
-  // mushrooms
   base_big_swing = 0
   shroom_phase = 1
 
