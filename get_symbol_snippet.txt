@@ -1,0 +1,22 @@
+
+
+var cache = []
+func _detect_snowballs()
+  var x = screen.FromWorldX(pos.x)
+  var y = screen.FromWorldZ(pos.z)
+  var s
+  >`0,0,x=@x@, y=@y@
+  for px = x .. x+10
+    for py = y-4 .. y+4
+      ?draw.GetSymbol(px, py) = "(" & 
+      ^draw.GetSymbol(px+1, py) = "_" & 
+      ^draw.GetSymbol(px+2, py) = ")"
+        s = x+","+y+","+px+","+py+","+"ball"
+        >`@px@,@py+3@,#green,^^^
+        ?!cache.Contains(s)
+          cache.Add(s)
+  var arr_size = cache.Count()
+  ?arr_size > 0
+    for line = 1 .. arr_size
+      var v = cache[line-1]
+      >`40,@line@,@v@
