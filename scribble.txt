@@ -130,7 +130,7 @@ HP, will prioritize `ah` shield and `dL` weapon
 over foe's elemental weakness.
 If 1, will always try to lifesteal to max.
 If 0, will never force lifesteal. */
-var low_hp_threshold = 1
+var low_hp_threshold = 0.5
 
 // Switch to 1h + shield when `low_hp_threshold`
 var use_shield_on_low_hp = true
