@@ -39,9 +39,10 @@ def minimize():
     with open("min.txt", mode="w", encoding="utf-8") as f:
         f.write("\n".join(new_min_header) + "\n" + "\n".join(new_body))
     for fname in ("dev.scribble.txt", "scribble.txt", "min.txt"):
-        print(
-            f"{fname.rjust(len('dev.scribble.txt'))}: {os.stat(fname).st_size/1024} Kb"
-        )
+        size = os.stat(fname).st_size / 1024
+        print(f"{fname.rjust(len('dev.scribble.txt'))}: {size} kb")
+        if not fname.startswith("dev") and size > 40:
+            print(f"WARNING: {fname} is over 40kb!")
 
 
 if __name__ == "__main__":

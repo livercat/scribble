@@ -133,7 +133,7 @@ HP, will prioritize `ah` shield and `dL` weapon
 over foe's elemental weakness.
 If 1, will always try to lifesteal to max.
 If 0, will never force lifesteal. */
-var low_hp_threshold = 1
+var low_hp_threshold = 0.8
 
 // Switch to 1h + shield when `low_hp_threshold`
 var use_shield_on_low_hp = true
@@ -260,7 +260,7 @@ func avoid_explosion()
     return try_evade()
   ?idle_mask
     return auto_equip_L() & equip_R("mask")
-  return disable_r("bash") & melee("def")
+  return equip_L("sword") & equip_R("dashing")
 func fight()
   ?phys_immune | foe = magic_vulnerability
     return auto_ranged()
@@ -370,7 +370,7 @@ func auto_melee_boss()
   auto_melee()
   stance = "boss " + stance
 func auto_melee_miniboss()
-  disable_r("blade") & disable_r("mask") &
+  var a = disable_r("blade")&disable_r("mask")&
   ^auto_melee()
   stance = "miniboss " + stance
 var can_stunlock = do_stunlock.Count() > 0 &
@@ -1060,7 +1060,8 @@ false, "smite", false, "stun", false,
 "pick_pocket",0,
 ]
 func _update_statuses()
-  my_buffs.Clear() & my_debuffs.Clear()
+  my_buffs.Clear()
+  my_debuffs.Clear()
   for i = 1 .. my_statuses.Count() - 1
     ?i < 9
       my_statuses[i] = false
@@ -1347,23 +1348,18 @@ func draw_ui()
           r = "Arm"
         >`@x@,@y@,#@colorize(cd)@,
         ^@string.Capitalize(r)@
-        ^@time.FormatDigital(cd)@
+        ^ @time.FormatDigital(cd)@
         y++
     >`@x@,@y@,
     ^#@colorize(get_cd("quarterstaff"))@,QS
-    x = x + 2
     ?abilities.Contains("bash")
-      >`@x@,@y@,@gray@,/
-      x++
-      >`@x@,@y@,
+      >`@x+2@,@y@,@gray@,/
+      >`@x+3@,@y@,
       ^#@colorize(get_cd("bash"))@,B
-      x++
     ?abilities.Contains("dash")
-      >`@x@,@y@,@gray@,/
-      x++
-      >`@x@,@y@,
+      >`@x+4@,@y@,@gray@,/
+      >`@x+5@,@y@,
       ^#@colorize(get_cd("dash"))@,D
-      x++
   ?ui_show_debug
     x = 1
     y = 14
@@ -1377,7 +1373,7 @@ func draw_ui()
     >`@x@,@y@,#blue,Lock: @lock@ (@lock_timer@)
     >`@x@,@y+1@,#blue,Stance: @stance@
     >`@x@,@y+2@,@gray@,@loc.stars@*
-    ^@time.FormatDigital(totaltime)@ @foe@
+    ^ @time.FormatDigital(totaltime)@ @foe@
     var _weapon = " (L)"
     x = screen.w - 10
     y = 23
