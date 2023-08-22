@@ -120,7 +120,7 @@ func colorize(cd)
 // and this happens every frame
 parse_statuses()
 // now `my_buffs` and `my_debuffs` contain
-// pretty status string, and we can show them
+// pretty status strings, and we can show them
 show_statuses()
 // and show cooldowns too
 show_cooldowns()
