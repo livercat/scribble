@@ -1,0 +1,126 @@
+var statuses = [
+  ["smite", "Smite", "+"], 
+  ["pick_pocket", "Pickpocket", "+"],
+  ["vampiric", "Vamp", "+"],
+  ["lucky_crit_multi", "Lucky", "+"],
+  ["invisibility", "Invis", "+"],
+  ["debuff_damage", "DmgDown", "-"],
+  ["debuff_duration_damage", "DmgDown", "-"],
+  ["spider_debuff_damage", "DmgDown", "-"],
+  ["dysangelos_debuff_damage", "DmgDown", "-"],
+  ["puff_debuff_damage", "DmgDown", "-"],
+  ["debuff_yeti_chill", "AtkSlow", "-"],
+  ["debuff_attack_speed", "AtkSlow", "-"],
+  ["debuff_move_speed", "MoveSlow", "-"],
+  ["debuff_chill", "Chill", "-"],
+  ["stun", "Stun", "-"],
+  ["pallas_phase2_debuff", "RangeDown", "-"],
+  ["debuff_dot", "FireDoT", "-"],
+]
+var ignore = [ // irrelevant statuses
+  "quarterstaff_buff_attack_speed",
+  "quarterstaff_buff_stun",
+  "bardiche_buff_aoe_chance",
+  "bardiche_buff_crit_chance",
+  "bardiche_buff_crit_mult",
+  "bardiche_buff_move_speed",
+]
+var status_uids = []
+var my_buffs = []
+var my_debuffs = []
+
+var template = "{0}({1}) {2}"
+func parse_statuses()
+  // clear buffs/debuffs from the last frame
+  my_buffs.Clear()
+  my_debuffs.Clear()
+  
+  for s : [buffs.string, debuffs.string]
+    // format of buff and beduff strings:
+    // icon:name:count:duration,...
+
+    // split it into pieces:
+    // [icon, name, count, duration]
+    var splt = string.Split(s, ":", ",", false)
+    var arr_size = splt.Count()
+    ?arr_size > 0
+      // iterate over names (2nd field)
+      for i = 1 .. arr_size - 3
+        var status = splt[i]
+        var amount = int.Parse(splt[i+1])
+        var idx = status_uids.IndexOf(status)
+        ?idx ! -1
+          var info = statuses[idx]
+          var duration = int.Parse(splt[i+2])
+          var pretty_name = string.Format(
+          ^template, info[1], amount,
+          ^time.FormatDigital(duration))
+          ?info[2] = "+"
+            my_buffs.Add(pretty_name)
+          :
+            my_debuffs.Add(pretty_name)
+        i = i + 3 // skip to the next status
+
+func show_cooldowns()
+  var mindCD = item.GetCooldown("mind")
+  var staffCD = item.GetCooldown("quarterstaff")
+  var bashCD = item.GetCooldown("bash")
+  var dashCD = item.GetCooldown("dash")
+  var armCD = item.GetCooldown("skeleton_arm")
+  var hammerCD = item.GetCooldown("hammer")
+  var smiteCD = item.GetCooldown("blade")
+  var bardCD = item.GetCooldown("bardiche")
+  var maskCD = item.GetCooldown("mask")
+
+  var y = 6
+
+  >`1,@y@,#@colorize(mindCD)@,
+  ^Mind @time.FormatDigital(mindCD)@
+
+  >`1,@y+1@,#@colorize(hammerCD)@,
+  ^Hammer @time.FormatDigital(hammerCD)@
+
+  >`1,@y+2@,#@colorize(bardCD)@,
+  ^Bard @time.FormatDigital(bardCD)@
+  
+  >`1,@y+3@,#@colorize(smiteCD)@,
+  ^Blade @time.FormatDigital(smiteCD)@
+
+  >`1,@y+4@,#@colorize(armCD)@,
+  ^Arm @time.FormatDigital(armCD)@
+
+  >`1,@y+5@,#@colorize(maskCD)@,
+  ^Mask @time.FormatDigital(maskCD)@
+
+func show_statuses()
+  var y = 24
+  >`1,@y+1@,#FE6800,
+  ^- @string.Join(", ", my_debuffs)@
+  >`1,@y@,#00A300,
+  ^+ @string.Join(", ", my_buffs)@
+
+func colorize(cd)
+  ?cd > 0
+    return "red"
+  return "green"
+
+
+// execution starts here
+
+?loc.begin
+  // this happens only once, not every frame
+  // and not every loop
+
+  // create an array with status uids
+  // so we can quickly check if we know
+  // about a buff/debuff
+  for info : statuses
+    status_uids.Add(info[0])
+
+// and this happens every frame
+parse_statuses()
+// now `my_buffs` and `my_debuffs` contain
+// pretty status string, and we can show them
+show_statuses()
+// and show cooldowns too
+show_cooldowns()

@@ -1557,7 +1557,7 @@ func draw_ui()
     >`@x@,@y@,#blue,Lock: @lock@ (@lock_timer@)
     >`@x@,@y+1@,@gray@,@loc.stars@*
     ^ @time.FormatDigital(totaltime)@
-    ^ @time.FormatDigital(loc.averageTime)@ @foe@
+    ^/@time.FormatDigital(loc.averageTime)@ @foe@
     var _weapon = " (L)"
     x = screen.w - 10
     y = 23
