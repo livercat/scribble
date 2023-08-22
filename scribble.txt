@@ -63,7 +63,7 @@ var aoe_treshold = 4
 /* Weapons to use for melee AoE, same priority 
 logic as the regular melee. */
 var for_melee_aoe = [
-  "arm","bardiche", "heavy hammer", "big sword",
+  "arm", "bardiche", "big sword",
 ]
 
 /* If this is set to `true`, script will prefer
@@ -73,7 +73,7 @@ var prefer_ranged = false
 
 /* Will prefer st/aoe ranged for these enemies,
 but will try to get in melee if they are near */
-var prefer_ranged_foes = ["ant"]
+var prefer_ranged_foes = []
 
 /* Will exclusively use single-target ranged
 against these enemies */
@@ -215,6 +215,8 @@ func progress()
   :?loc = fungus_forest_boss
     return fight_mushrooms()
   :?loc = mushroom & cmp(foe.id, "epic_snail")
+    disable_r("hammer") // don't stun mr fluffy
+    disable_r("bash")
     return auto_melee_miniboss()
   :?loc = undead_crypt_boss
     return fight_pallas()
@@ -258,7 +260,7 @@ func healwalk()
 func avoid_explosion()
   stance = "avoiding explosion"
   ?foe_dist < 5
-    disable_r("any_dash")
+    set_lock("explode", 1)
     return try_evade()
   return melee("def")
 
@@ -581,13 +583,13 @@ func get_preferred_types(range, aoe)
     return for_phys_immune
   var types = for_melee_single_target
   ?cmp(range, "melee")
-    ?aoe
-      types = for_melee_aoe
     ?foe.armor > 0
       ?aoe
         types = aa_aoe_types
       :
         types = aa_st_types
+    :?aoe
+      types = for_melee_aoe
   :
     ?aoe
       types = for_ranged_aoe
@@ -843,6 +845,7 @@ func aac(weapon)
   
 func try_evade()
   ?can_mind
+    set_lock("mind", 1)
     return backflip()
   return shield_block_big_hit()
 
@@ -953,26 +956,18 @@ func fight_bolesh()
     ranged("single")
 
 func fight_mushrooms()
-  ?base_big_swing = 0
-    ?shroom_phase = 1
-      base_big_swing = 46
-    :
-      base_big_swing = 26
   // thanks to user `fruloo` from the discord!
   var delay = 7*get(foe_debuffs, "debuff_chill")
   ?foe = phase1
     disable_r("skeleton_arm")
     ?foe_s = 32 & 
-    ^evade_at(base_big_swing + delay)
+    ^evade_at(46 + delay)
       return
     :?foe_s = 33 & foe_t = foe_dist + 4
       return shield_block()
   :?foe = mushroom_boss_fat
-    shroom_phase = 2
-    ?get(foe_debuffs, "stun")
-      base_big_swing = base_big_swing + 1
     ?foe_s = 32 & 
-    ^evade_at(base_big_swing + delay)
+    ^evade_at(26 + delay)
       return
   auto_melee_boss()
 
@@ -1073,8 +1068,6 @@ func is_poison_near(pos_x, pos_y)
 **     #Internals   **
 *********************/
 var at_boss = false // to disable default fight
-var base_big_swing = 0 // mushrooms
-var shroom_phase = 1
 // player status
 var stance = "unknown" // chosen combat stance
 var low_hp = false // hp < (maxhp * threshold)
@@ -1587,8 +1580,6 @@ func reset_loop()
   // bosses
   at_boss = false
   naga_step = 0
-  base_big_swing = 0
-  shroom_phase = 1
 
 ?loc.begin
   _prepare_statuses()
