@@ -260,7 +260,6 @@ func healwalk()
 func avoid_explosion()
   stance = "avoiding explosion"
   ?foe_dist < 5
-    set_lock("explode", 1)
     return try_evade()
   return melee("def")
 
@@ -845,7 +844,7 @@ func aac(weapon)
   
 func try_evade()
   ?can_mind
-    set_lock("mind", 1)
+    set_lock("mind", 2)
     return backflip()
   return shield_block_big_hit()
 
@@ -969,6 +968,8 @@ func fight_mushrooms()
     ?foe_s = 32 & 
     ^evade_at(26 + delay)
       return
+    :?foe_s = 32 & foe_t > (26 + delay)&can_mind
+      return backflip() // safety
   auto_melee_boss()
 
 func fight_pallas()
@@ -1396,7 +1397,7 @@ func _update_lock()
   clear_lock("stun")
   ?get(my_statuses, "stun")
     set_lock("stun", 0)
-  ?lock
+  :?lock
     ?lock_timer <= 0
       lock = false
     :
