@@ -214,9 +214,8 @@ func progress()
       return fight_bolesh()
   :?loc = fungus_forest_boss
     return fight_mushrooms()
-  :?loc = mushroom
-    ?cmp(foe.id, "epic_snail")
-      return auto_melee_miniboss()
+  :?loc = mushroom & cmp(foe.id, "epic_snail")
+    return auto_melee_miniboss()
   :?loc = undead_crypt_boss
     return fight_pallas()
   :?loc = halls
@@ -227,6 +226,9 @@ func progress()
     return fight_bronze_guardian()
   :?loc = icy_ridge
     return fight_hrimnir()
+  :?loc = temple & 
+    ^cmp(foe.id, "acronian_cultist")
+    return auto_melee_miniboss()
   :?loc = nagaraja
     return fight_nagaraja()
   :
@@ -805,6 +807,8 @@ func use_abilities()
   ?pickpocket_quest & can_slap()
     return slap()
   // then use where needed
+  ?should_mask()
+    return mask()
   ?should_hammer()
     return hammer()
   ?should_smite()
@@ -814,8 +818,6 @@ func use_abilities()
   ?should_slap()
     return slap()
   // use mask right before debuffing
-  ?should_mask()
-    return mask()
   return false
 
 func can_activate()
