@@ -1,8 +1,10 @@
 var statuses = [
-  ["smite", "Smite", "+"], 
+  ["berserk", "Berserk", "+"],
+  ["smite", "Smite", "+"],
   ["pick_pocket", "Pickpocket", "+"],
   ["vampiric", "Vamp", "+"],
-  ["lucky_crit_multi", "Lucky", "+"],
+  ["lucky_crit", "CritUp", "+"],
+  ["lucky_mult", "CritMultUp", "+"],
   ["invisibility", "Invis", "+"],
   ["debuff_damage", "DmgDown", "-"],
   ["debuff_duration_damage", "DmgDown", "-"],
