@@ -130,7 +130,7 @@ HP, will prioritize `ah` shield and `dL` weapon
 over foe's elemental weakness.
 If 1, will always try to lifesteal to max.
 If 0, will never force lifesteal. */
-var low_hp_threshold = 0.5
+var low_hp_threshold = 1
 
 // Switch to 1h + shield when `low_hp_threshold`
 var use_shield_on_low_hp = true
@@ -260,8 +260,8 @@ func healwalk()
 func avoid_explosion()
   stance = "avoiding explosion"
   ?foe_dist < 5
-    set_lock("explode", 1)
     return try_evade()
+  disable_r("bash")
   return melee("def")
 
 /********************
@@ -845,7 +845,7 @@ func aac(weapon)
   
 func try_evade()
   ?can_mind
-    set_lock("mind", 1)
+    set_lock("mind", 2)
     return backflip()
   return shield_block_big_hit()
 
@@ -969,6 +969,8 @@ func fight_mushrooms()
     ?foe_s = 32 & 
     ^evade_at(26 + delay)
       return
+    :?foe_s = 32 & foe_t > (26 + delay)&can_mind
+      return backflip() // safety
   auto_melee_boss()
 
 func fight_pallas()
@@ -1396,7 +1398,7 @@ func _update_lock()
   clear_lock("stun")
   ?get(my_statuses, "stun")
     set_lock("stun", 0)
-  ?lock
+  :?lock
     ?lock_timer <= 0
       lock = false
     :
