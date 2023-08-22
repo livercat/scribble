@@ -2,18 +2,18 @@
 var elemental_items = [
   ["hammer",
     ["aether", "D"],
-    ["poison", "D+6", "D+7"],
+    ["poison", "D+7", "D+6"],
     ["ice", "D"],
   ],
   ["wand",
-    ["vigor", "D", "dL"],
+    ["vigor", "D+8", "D+7"],
   ],
   ["sword",
     ["aether", "D"],
     ["fire", "D+7", "D+4", "dF"],
     ["ice", "dI"],
     ["poison", "dP", "D"],
-    ["vigor", "dL"],
+    ["vigor", "D", "dL"],
     ["default", "vigor sword dL",
                 "poison sword D"],
   ],
@@ -145,6 +145,9 @@ var smite_treshold = 7
 // Depends on level/enchants of your BFG.
 var smite_damage = 85
 
+// Enable smiting two screens at once
+var long_long_smite = true
+
 // Choose amount based on your `dI` weapon
 var max_chill_stacks = 6
 
@@ -187,6 +190,8 @@ var ui_show_statuses = true
 // Show debug info (noisy, useful for research)
 var ui_show_debug = true
 func progress()
+  ?long_long_smite & smite_two_screens()
+    return true
   ?healwalk()
     return true
   ?foe = explode
@@ -261,8 +266,19 @@ func avoid_explosion()
   ?idle_mask
     return auto_equip_L() & equip_R("mask")
   return equip_L("sword") & equip_R("dashing")
+func smite_two_screens()
+  var cd_ok = get_cd("blade") <= 0
+  ?cd_ok & foe.count > 3
+    screen.Next()
+  :
+    screen.ResetOffset()
+  ?foe.hp < 200 & foe.hp > 0 &
+  ^cd_ok & foe.distance < 25 & foe.count > 5
+    return smite()
+  return false
 func fight()
-  ?phys_immune | foe = magic_vulnerability
+  ?phys_immune | (foe = magic_vulnerability &
+  ^can_aoe)
     return auto_ranged()
   ?must_ranged_foe()
     return ranged("single")
@@ -1400,7 +1416,9 @@ func is(s1, s2)
     return false
   return string.Equals(s1, s2)
 func brew_pot()
-  brew wood + bronze
+  ?loc = caves | loc = Mushroom | loc = mine |
+  ^loc = halls
+    brew wood + bronze
 func reset_loop()
   lock = false
   lock_timer = 0
@@ -1413,10 +1431,12 @@ func reset_loop()
   _prepare_items()
   _prepare_ranges()
   _prepare_abilities()
-  ?item.potion = empty
+  ?use_potions_for_bosses
     brew_pot()
+  :?item.potion = empty
+    brew tar + bronze
 :?loc.loop
-  ?item.potion = empty
+  ?use_potions_for_bosses
     brew_pot()
   reset_loop()
 :?ai.enabled & !ai.paused

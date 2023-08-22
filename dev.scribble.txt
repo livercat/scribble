@@ -2,18 +2,18 @@
 var elemental_items = [
   ["hammer",
     ["aether", "D"],
-    ["poison", "D+6", "D+7"],
+    ["poison", "D+7", "D+6"],
     ["ice", "D"],
   ],
   ["wand", 
-    ["vigor", "D", "dL"],
+    ["vigor", "D+8", "D+7"],
   ],
   ["sword", 
     ["aether", "D"],
     ["fire", "D+7", "D+4", "dF"],
     ["ice", "dI"],
     ["poison", "dP", "D"],
-    ["vigor", "dL"],
+    ["vigor", "D", "dL"],
     ["default", "vigor sword dL",
                 "poison sword D"],
   ],
@@ -145,6 +145,9 @@ var smite_treshold = 7
 // Depends on level/enchants of your BFG.
 var smite_damage = 85
 
+// Enable smiting two screens at once
+var long_long_smite = true
+
 // Choose amount based on your `dI` weapon
 var max_chill_stacks = 6
 
@@ -191,21 +194,28 @@ var ui_show_debug = true
 **     #Progress    **
 *********************/
 func progress()
+  ?long_long_smite & smite_two_screens()
+    return true
+
   ?healwalk() // no enemies nearby
     return true
+
   ?foe = explode
     return avoid_explosion()
+
   ?should_stunlock()
     ?!is(foe.id, "cool_bat")
       free_mind = true
     return stunlock()
+
   ?!is_boss & !at_boss
-    /* Add your non-boss zone logic here */
     free_mind = true
     return fight()
+
   stance = "boss combat"
   ?loc.stars > 5
     disable_r("skeleton_arm")
+
   ?loc = rocky
     ?foe.id = "acronian_scout"
       return fight_scout()
@@ -271,11 +281,23 @@ func avoid_explosion()
     return auto_equip_L() & equip_R("mask")
   return equip_L("sword") & equip_R("dashing")
 
+func smite_two_screens()
+  var cd_ok = get_cd("blade") <= 0
+  ?cd_ok & foe.count > 3
+    screen.Next()
+  :
+    screen.ResetOffset()
+  ?foe.hp < 200 & foe.hp > 0 &
+  ^cd_ok & foe.distance < 25 & foe.count > 5
+    return smite()
+  return false
+
 /********************
 **     #Combat    **
 ********************/
 func fight()
-  ?phys_immune | foe = magic_vulnerability
+  ?phys_immune | (foe = magic_vulnerability &
+  ^can_aoe)
     return auto_ranged()
   ?must_ranged_foe()
     return ranged("single")
@@ -1581,8 +1603,9 @@ func is(s1, s2)
   return string.Equals(s1, s2)
 
 func brew_pot()
-  // brew tar + bronze // vampiric
-  brew wood + bronze // berserk
+  ?loc = caves | loc = Mushroom | loc = mine |
+  ^loc = halls
+    brew wood + bronze // berserk
 
 func reset_loop()
   lock = false
@@ -1598,15 +1621,17 @@ func reset_loop()
   _prepare_items()
   _prepare_ranges()
   _prepare_abilities()
-  ?item.potion = empty
+  ?use_potions_for_bosses
     brew_pot()
+  :?item.potion = empty
+    brew tar + bronze // vampiric
   // ?loc = halls
   //   prefer_ranged = true
   //   for_ranged_single_target = ["wand"]
   // ?loc = caves
   //   prefer_ranged = true
 :?loc.loop
-  ?item.potion = empty
+  ?use_potions_for_bosses
     brew_pot()
   reset_loop()
 :?ai.enabled & !ai.paused
