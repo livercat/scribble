@@ -1268,7 +1268,49 @@ func dbg(e)
 func panic(e)
   >`20,5,#red,@e@
   loc.Pause()
-
+var enable_hit_tracking = false
+var last_frame_dist = 0
+var last_frame_armor = 0
+var last_frame_hp = 0
+var last_frame_foe = ""
+var last_frame_dist = 0
+var last_frame_state = -1
+var last_frame_time = -1
+var last_frame_stance = ""
+var debuff_hash = "sl={0},st={1},d={2},r={3},
+^aspd={4}"
+var last_frame_debuffs = string.Format(
+^debuff_hash, false, false, 0, 0, 0)
+func track_hits()
+  var hp_diff = last_frame_hp - hp
+  var _debuffs = string.Format(debuff_hash,
+  ^get(my_statuses, "slow"),
+  ^get(my_statuses, "stun"),
+  ^get(my_statuses, "damage_down"),
+  ^get(my_statuses, "range_down"),
+  ^get(my_statuses, "aspd_down"))
+  ?hp_diff > 0 |
+  ^(last_frame_debuffs ! _debuffs)
+    var y = 2
+    >`20,@y@,#red,Got hit!
+    >`20,@y+1@,Last frame info:
+    >`20,@y+2@,hp = @last_frame_hp@ (diff =
+    ^@hp_diff@)
+    >`20,@y+3@,armor = @last_frame_armor@
+    >`20,@y+4@,id = @last_frame_foe@
+    >`20,@y+5@,dist = @last_frame_dist@
+    >`20,@y+6@,state = @last_frame_state@
+    >`20,@y+7@,time = @last_frame_time@
+    >`20,@y+8@,stance = @last_frame_stance@
+    loc.Pause()
+  last_frame_armor = armor
+  last_frame_hp = hp
+  last_frame_foe = foe.id
+  last_frame_dist = foe_dist
+  last_frame_state = foe_s
+  last_frame_time = foe_t
+  last_frame_stance = stance
+  last_frame_debuffs = _debuffs
 var gray = "#7A8F93"
 func draw_ui()
   var x = 1
@@ -1355,7 +1397,6 @@ func reset_loop()
   lock_timer = 0
   my_weird.Clear()
   enable_hit_tracking = false
-  // bosses
   at_boss = false
   naga_step = 0
 ?loc.begin

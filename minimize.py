@@ -10,24 +10,38 @@ sep = """
 /*********************
 **     #Progress    **
 *********************/"""
+
+
 def minimize():
-    with open("scribble.txt", mode="r", encoding="utf-8") as f:
-        text = f.read()
-    parts = text.split(sep)
-    text = multiline_comment_re.sub("", parts[1])
-    text = comment_re.sub("", text)
-    new_text = []
+    with open("dev.scribble.txt", mode="r", encoding="utf-8") as f:
+        whole = f.read()
+    parts = whole.split(sep)
+    body = multiline_comment_re.sub("", parts[1])
+    body = comment_re.sub("", body)
+    new_body = []
+    new_header = []
+    new_min_header = []
+    min_header = multiline_comment_re.sub("", parts[0])
+    min_header = comment_re.sub("", min_header)
     for line in parts[0].splitlines():
         line = line.rstrip()
-        new_text.append(line)
-    for line in text.splitlines():
+        new_header.append(line)
+    for line in body.splitlines():
         line = line.rstrip()
         if line:
-            new_text.append(line)
-    with open("release.txt", mode="w", encoding="utf-8") as f:
-        f.write("\n".join(new_text))
-    print(f"old: {os.stat('scribble.txt').st_size/1024} Kb")
-    print(f"new: {os.stat('release.txt').st_size/1024} Kb")
+            new_body.append(line)
+    for line in min_header.splitlines():
+        line = line.rstrip()
+        if line:
+            new_min_header.append(line)
+    with open("scribble.txt", mode="w", encoding="utf-8") as f:
+        f.write("\n".join(new_header) + "\n" + "\n".join(new_body))
+    with open("min.txt", mode="w", encoding="utf-8") as f:
+        f.write("\n".join(new_min_header) + "\n".join(new_body))
+    for fname in ("dev.scribble.txt", "scribble.txt", "min.txt"):
+        print(
+            f"{fname.rjust(len('dev.scribble.txt'))}: {os.stat(fname).st_size/1024} Kb"
+        )
 
 
 if __name__ == "__main__":
