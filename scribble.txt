@@ -73,8 +73,7 @@ var prefer_ranged = false
 
 /* Will prefer st/aoe ranged for these enemies,
 but will try to get in melee if they are near */
-var prefer_ranged_foes = ["ant","ice elemental",
-"fire elemental"]
+var prefer_ranged_foes = ["ant"]
 
 /* Will exclusively use single-target ranged
 against these enemies */
@@ -131,10 +130,10 @@ HP, will prioritize `ah` shield and `dL` weapon
 over foe's elemental weakness.
 If 1, will always try to lifesteal to max.
 If 0, will never force lifesteal. */
-var low_hp_threshold = 1
+var low_hp_threshold = 0.5
 
 // Switch to 1h + shield when `low_hp_threshold`
-var use_shield_on_low_hp = false
+var use_shield_on_low_hp = true
 
 /* At least this many enemies must be present
 to use Smite ability. */
@@ -1009,7 +1008,7 @@ func fight_hrimnir()
     return auto_melee_boss()
   :?foe.count > 2
     ?can_hammer() & 
-    ^get(my_statuses, "slow") = 0 &
+    ^!get(my_statuses, "slow") &
     ^screen.FromWorldX(pos.x) < 40
       return hammer()
     return melee("aoe")
