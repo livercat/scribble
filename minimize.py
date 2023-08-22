@@ -37,7 +37,7 @@ def minimize():
     with open("scribble.txt", mode="w", encoding="utf-8") as f:
         f.write("\n".join(new_header) + "\n" + "\n".join(new_body))
     with open("min.txt", mode="w", encoding="utf-8") as f:
-        f.write("\n".join(new_min_header) + "\n".join(new_body))
+        f.write("\n".join(new_min_header) + "\n" + "\n".join(new_body))
     for fname in ("dev.scribble.txt", "scribble.txt", "min.txt"):
         print(
             f"{fname.rjust(len('dev.scribble.txt'))}: {os.stat(fname).st_size/1024} Kb"
