@@ -977,8 +977,8 @@ func fight_mushrooms()
   auto_melee_boss()
 
 func fight_pallas()
+  disable_r("skeleton_arm")
   ?foe = phase1
-    disable_r("skeleton_arm")
     ?foe_s = 32 & foe_t = 68
       return shield_block()
     return auto_melee_boss()
