@@ -130,7 +130,7 @@ HP, will prioritize `ah` shield and `dL` weapon
 over foe's elemental weakness.
 If 1, will always try to lifesteal to max.
 If 0, will never force lifesteal. */
-var low_hp_threshold = 0.5
+var low_hp_threshold = 1
 
 // Switch to 1h + shield when `low_hp_threshold`
 var use_shield_on_low_hp = true
@@ -180,9 +180,6 @@ var ui_show_statuses = true
 // Show debug info (noisy, useful for research)
 var ui_show_debug = true
 
-/*********************
-**     #Progress    **
-*********************/
 func progress()
   ?healwalk() // no enemies nearby
     return true
@@ -193,7 +190,6 @@ func progress()
       free_mind = true
     return stunlock()
   ?!is_boss & !at_boss
-    /* Add your non-boss zone logic here */
     free_mind = true
     return fight()
   stance = "boss combat"
@@ -207,8 +203,6 @@ func progress()
     return fight_xyloalgia()
   :?loc = caves
     ?cmp(foe.id, "cool_bat")
-      /* If `do_stunlock` is enabled for it,
-      it will take precedence. */
       return auto_melee_miniboss()
     :
       return fight_bolesh()
@@ -264,9 +258,6 @@ func avoid_explosion()
   disable_r("bash")
   return melee("def")
 
-/********************
-**     #Combat    **
-********************/
 func fight()
   ?phys_immune | foe = magic_vulnerability
     return auto_ranged()
@@ -441,10 +432,6 @@ func stunlock()
   equip_L(stunlock_weapons[0])
   ?stunlock_weapons.Count() > 1
     equip_R(stunlock_weapons[1])
-
-/**********************
-** #Weapon switching **
-**********************/
 
 var _equip_L = false
 func equip_L(it)
@@ -648,9 +635,6 @@ func can_be_debuffed(debuff_uid)
     ^< max_chill_stacks
   return !get(foe_debuffs, debuff_uid)
 
-/********************
-**    #Abilities   **
-********************/
 func get_cd(ability)
   return get(cooldowns, ability)
 
@@ -838,10 +822,6 @@ func aac(weapon)
     equip wand
   equip @weapon@
   return weapon
-
-/*****************
-**    #Bosses   **
-*****************/
   
 func try_evade()
   ?can_mind
@@ -933,10 +913,6 @@ func fight_xyloalgia()
   auto_melee_boss()
 
 func fight_bolesh()
-  // Get close, debuff/use abilities, then
-  // jump to ranged before the first melee bite,
-  // and continue shooting and blocking.
-  // TODO: potion
   ?foe_s = 133 & ((foe_t > 9 & foe_t < 12) | 
   ^(foe_t > 14 & foe_t < 17))
     // block bite and don't move from ranged
@@ -1103,11 +1079,6 @@ var all_elems = [
 var aa_st_types = []
 var aa_aoe_types = []
 var all_items = [/*
-hash, [weapon1, weapon2,], hash, [weapon3], ...
-for example:
-sword-aether-stats, [aether sword D],
-hammer-fire-mod, [fire hammer dF],
-wand-default, [stone wand + 10],
 */]
 func _prepare_items()
    // [type, [elem, s1, sn], [elem2...]]
@@ -1444,50 +1415,6 @@ func panic(e)
   >`20,5,#red,@e@
   loc.Pause()
 
-var enable_hit_tracking = false
-var last_frame_dist = 0
-var last_frame_armor = 0
-var last_frame_hp = 0
-var last_frame_foe = ""
-var last_frame_dist = 0
-var last_frame_state = -1
-var last_frame_time = -1
-var last_frame_stance = ""
-var debuff_hash = "sl={0},st={1},d={2},r={3},
-^aspd={4}"
-var last_frame_debuffs = string.Format(
-^debuff_hash, false, false, 0, 0, 0)
-func track_hits()
-  var hp_diff = last_frame_hp - hp
-  var _debuffs = string.Format(debuff_hash,
-  ^get(my_statuses, "slow"), 
-  ^get(my_statuses, "stun"), 
-  ^get(my_statuses, "damage_down"),
-  ^get(my_statuses, "range_down"),
-  ^get(my_statuses, "aspd_down"))
-  ?hp_diff > 0 | 
-  ^(last_frame_debuffs ! _debuffs)
-    var y = 2
-    >`20,@y@,#red,Got hit!
-    >`20,@y+1@,Last frame info:
-    >`20,@y+2@,hp = @last_frame_hp@ (diff = 
-    ^@hp_diff@)
-    >`20,@y+3@,armor = @last_frame_armor@
-    >`20,@y+4@,id = @last_frame_foe@
-    >`20,@y+5@,dist = @last_frame_dist@
-    >`20,@y+6@,state = @last_frame_state@
-    >`20,@y+7@,time = @last_frame_time@
-    >`20,@y+8@,stance = @last_frame_stance@
-    loc.Pause()
-  last_frame_armor = armor
-  last_frame_hp = hp
-  last_frame_foe = foe.id
-  last_frame_dist = foe_dist
-  last_frame_state = foe_s
-  last_frame_time = foe_t
-  last_frame_stance = stance
-  last_frame_debuffs = _debuffs
-
 var gray = "#7A8F93"
 func draw_ui()
   var x = 1
@@ -1590,11 +1517,6 @@ func reset_loop()
   _prepare_abilities()
   ?item.potion = empty
     brew_pot()
-  // ?loc = halls
-  //   prefer_ranged = true
-  //   for_ranged_single_target = ["wand"]
-  // ?loc = caves
-  //   prefer_ranged = true
 :?loc.loop
   reset_loop()
 :?ai.enabled & !ai.paused
