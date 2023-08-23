@@ -3,9 +3,13 @@ var elemental_items = [
     ["aether", "D", "dU+8", "dU+7"],
     ["poison", "D+7", "D+6"],
     ["ice", "D"],
+    ["default", "aether hammer D+8",
+    "aether hammer D+7"],
   ],
   ["wand",
     ["vigor", "D+8", "D+7"],
+    ["default", "vigor wand D+8",
+    "vigor wand D+7"],
   ],
   ["sword",
     ["aether", "D"],
@@ -151,17 +155,19 @@ func avoid_explosion()
   ?idle_mask
     return equip_R("mask")
   return equip_R("dashing")
+var scrolling = 0
 func smite_two_screens()
-  trace("long_smite")
   var cd_ok = get_cd("blade") <= 0
   ?cd_ok & foe.count > 3
+    scrolling++
     screen.Next()
   :
+    scrolling = 0
     screen.ResetOffset()
-  ?foe.hp < 200 & foe.hp > 0 &
-  ^cd_ok & foe.distance < 25 & foe.count > 5
+  ?foe_ehp < 200 & foe_ehp > 0 & cd_ok &
+  ^foe_dist<25 & (foe.count>5 | scrolling > 15)
     return smite()
-  return false
+  return scrolling > 0
 func regular_fight()
   trace("fight")
   ?phys_immune | (foe = magic_vulnerability &
@@ -209,7 +215,7 @@ func melee(mode)
   ?dash_closer()
     return true
   var aoe = is(mode, "aoe")
-  ?should_unmake()
+  ?!low_hp & should_unmake()
     ?try_equip_unmake("melee", aoe)
       trace("unmaking")
       mode = "unmake"
@@ -255,7 +261,7 @@ func ranged(mode)
     trace("low_hp")
   trace("r_" + mode)
   var is_aoe = is(mode, "aoe")
-  ?should_unmake()
+  ?!low_hp & should_unmake()
     ?try_equip_unmake("melee", aoe)
       trace("unmaking")
       mode = "unmake"
@@ -303,13 +309,13 @@ func stunlock()
     ?get_cd("dash") <= 0
       return equip_R("dashing")
   ?mirror
-    return equip_L("shovel")
+    ?should_drink()
+      drink()
+    return melee("dps")
   var foe_stunned = get(foe_debuffs, "stun")
-  ?(foe_stunned = 0 |
-  ^foe_stunned >= hammer_frames) &
-  ^can_hammer() | is(lock, "hammer")
+  ?can_hammer() | is(lock, "hammer")
     return hammer()
-  :?foe_stunned >= bard_frames &
+  :?(foe_stunned>=bard_frames/2 | foe_ehp<600)&
   ^should_bard() | is(lock, "bardiche")
     return bardiche()
   :?foe_stunned > 10
@@ -317,7 +323,7 @@ func stunlock()
       return smite()
     ?should_mask()
       return mask()
-  :?foe_stunned <= 1
+  :?foe_stunned <= 3
     ?get_cd("bash") <= 0 & foe_dist < 10 &
     ^foe_ehp > 100 & can_backflip()
       return backflip()
@@ -455,6 +461,7 @@ func select_weapon(range, aoe, elem,
   found_type = false
   var types = get_preferred_types(range, aoe)
   for ty : types
+    trace(ty)
     ?allow_2h | !is_2hander(ty)
       ?!elem_types.Contains(ty) &
       ^!is(purpose, "mod")
@@ -671,8 +678,6 @@ func mask()
   return true
 func use_abilities()
   trace("use_abilities")
-  ?get(my_statuses, "aspd_down") > 0
-    return false
   ?is(mask_quest,"simple") & can_mask()
     return mask()
   ?pickpocket_quest & can_slap()
@@ -708,7 +713,7 @@ func try_evade()
   ?can_mind
     set_lock("mind", 2)
     return backflip()
-  return shield_block_big_hit()
+  return hard_block()
 func evade_at(t)
   trace("evade_at")
   ?foe_t = t
@@ -719,13 +724,13 @@ func evade_at(t)
     ?foe_t > (t - hammer_frames)
       disable_r("hammer")
   return false
-func shield_block()
+func soft_block()
   trace("soft_block")
   ?lock
     return false
   return auto_equip_L("melee", false) &
   ^equip_R(evade_shield)
-func shield_block_big_hit()
+func hard_block()
   trace("hard_block")
   return equip_L("quest") &
   ^equip_R(evade_shield)
@@ -745,12 +750,12 @@ func fight_dysan()
   disable_r("skeleton_arm")
   ?foe = phase1
     ?foe_s = 33 & foe_t = 24
-      return shield_block()
+      return soft_block()
   :?foe = phase2
     auto_equip_dps("melee", false)
   :?foe = phase3
     ?foe_s = 32 & foe_t > 90
-      return shield_block()
+      return soft_block()
     :?foe_s = 115
       ?foe_t = 60
         return backflip()
@@ -758,10 +763,11 @@ func fight_dysan()
         disable_r("any_dash")
     :?foe_s = 106 | foe_s = 108 |
     ^foe_s = 0
-      return shield_block()
+      return soft_block()
   auto_melee_boss()
 func fight_xyloalgia()
-  var stunlock_poena = loc.stars > 5
+  disable_r("skeleton_arm")
+  var stunlock_poena = loc.stars > 5 &
   ^can_stunlock & do_stunlock.Contains("poena")
   ?foe = phase1
     ?stunlock_poena
@@ -769,24 +775,25 @@ func fight_xyloalgia()
       disable_r("hammer")
       disable_r("blade")
       disable_r("bardiche")
-    ?can_mind & foe_s = 32 & foe_t >= (33 +
+    ?can_mind & foe_s = 32 & foe_t >= (31 +
     ^7*get(foe_debuffs, "debuff_chill"))
+      set_lock("boss", 3)
       return backflip()
     ?get_cd("mind") < 355 & foe_s=33 & foe_t=1
-      return shield_block_big_hit()
+      return hard_block()
     return auto_melee_boss()
   ?stunlock_poena
     return stunlock()
   ?foe.buffs.string = "poena_mirror" &
   ^foe.hp > (foe.maxhp / 4)
-    return shield_block_big_hit()
+    return hard_block()
   :?foe_s = 32 & foe_t = 41
-    return shield_block_big_hit()
+    return hard_block()
   auto_melee_boss()
 func fight_bolesh()
   ?foe_s = 133 & ((foe_t > 9 & foe_t < 12) |
   ^(foe_t > 14 & foe_t < 17))
-    return shield_block_big_hit()
+    return hard_block()
   :?foe_s = 142 & evade_at(60)
     return true
   :?can_mind &
@@ -809,7 +816,7 @@ func fight_mushrooms()
     ?foe_s = 32 & evade_at(46 + delay)
       return
     :?foe_s = 33 & foe_t = foe_dist + 4
-      return shield_block()
+      return soft_block()
   :?foe = mushroom_boss_fat
     ?foe_s = 32 & evade_at(26 + delay)
       return
@@ -825,7 +832,7 @@ func fight_pallas()
   disable_r("skeleton_arm")
   ?foe = phase1
     ?foe_s = 32 & foe_t = 68
-      return shield_block()
+      return soft_block()
     return auto_melee_boss()
   :?foe = phase2
     ?foe.count > 2
@@ -848,12 +855,12 @@ func fight_bronze_guardian()
 func fight_hrimnir()
   at_boss = true
   ?is_snowball_near()
-    return shield_block()
+    return soft_block()
   var melee_ball = 23 +
   ^7*get(foe_debuffs, "debuff_chill")
   ?is_boss & foe_dist <= 6 &
   ^foe_s = 32 & foe_t >= melee_ball
-    return shield_block()
+    return soft_block()
   :?draw.GetSymbol(56, 13) = "o" | is_boss &
   ^foe_s = 133
     set_lock("boss", 2)
@@ -891,7 +898,7 @@ func fight_nagaraja()
     ?can_mind
       naga_step = 0
       return backflip()
-    return shield_block()
+    return soft_block()
   var near = false
   ?is_poison_near()
     near = true
@@ -912,7 +919,7 @@ func fight_nagaraja()
       backflip()
       naga_step = 0
     :?near
-      shield_block()
+      soft_block()
     :
       auto_melee_boss()
 func is_poison_near()
