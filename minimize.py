@@ -5,6 +5,9 @@ multiline_comment_re = re.compile(
     "/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/", flags=re.MULTILINE
 )
 comment_re = re.compile("//.*")
+ops_re = re.compile(
+    r" *(\||\/|\+|\-|\=|\&|\<|\>|\,|\!|\:(?!$)) *(?!(@|`|\?))", flags=re.MULTILINE
+)
 
 sep = """
 /*********************
@@ -18,11 +21,13 @@ def minimize():
     parts = whole.split(sep)
     body = multiline_comment_re.sub("", parts[1])
     body = comment_re.sub("", body)
+    body = ops_re.sub("\g<1>", body)
     new_body = []
     new_header = []
     new_min_header = []
     min_header = multiline_comment_re.sub("", parts[0])
     min_header = comment_re.sub("", min_header)
+    min_header = ops_re.sub("\g<1>", min_header)
     for line in parts[0].splitlines():
         line = line.rstrip()
         new_header.append(line)

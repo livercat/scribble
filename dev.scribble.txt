@@ -8,9 +8,17 @@ var elemental_items = [
                 "aether hammer D"],
   ],
   ["wand",
+    ["poison", "dP"],
+    ["ice", "dI"],
+    ["fire", "dF"],
     ["vigor", "D+8", "D+7"],
     ["default", "vigor wand D+8",
                 "vigor wand D+7"],
+  ],
+  ["crossbow",
+    ["poison", "dP"],
+    ["ice", "dI"],
+    ["fire", "dF"],
   ],
   ["sword",
     ["aether", "D", "dU+9","dU+8"],
@@ -31,9 +39,9 @@ var elemental_items = [
     ["default", "compound"],
   ],
 ]
-/* These non-elemental items can be used as 
+/* These non-elemental items can be used as
 weapon types in the lists below. */
-var special_weapons = ["bardiche", "blade", 
+var special_weapons = ["bardiche", "blade",
 "heavy hammer", "repeater", "arm"]
 
 /* By default script prefers to use melee, and
@@ -45,9 +53,9 @@ by default:
 2. Use hammers or heavy hammer if foe has armor.
 3. Use single-target or AoE weapons based on
    `foe.count`.
-4. If you're on low HP, use lifestealing 
+4. If you're on low HP, use lifestealing
    weapons and healing shields.
-5. If it's a boss, or if you have the Smite 
+5. If it's a boss, or if you have the Smite
    buff, debuffs the enemy.
 Settings below can change this logic. */
 
@@ -55,18 +63,18 @@ Settings below can change this logic. */
 1. First type + foe's weak element.
 2. Default weapon of the first type.
 3. Second type + foe's weak element.
-4. Continue 1-3 until a weapon is found. 
+4. Continue 1-3 until a weapon is found.
 If a weapon type isn't listed here, it will not
 be used. */
 var for_melee_single_target = [
   "sword", "big sword", "hammer",
 ]
 
-/* How many regular enemies are needed to start 
+/* How many regular enemies are needed to start
 using AoE weapons instead of single target. */
 var aoe_treshold = 4
 
-/* Weapons to use for melee AoE, same priority 
+/* Weapons to use for melee AoE, same priority
 logic as the regular melee. */
 var for_melee_aoe = [
   "arm", "bardiche", "big sword",
@@ -83,13 +91,13 @@ var prefer_ranged_foes = []
 
 /* Will exclusively use single-target ranged
 against these enemies */
-var must_ranged_foes = ["wasp", "wasp nest", 
+var must_ranged_foes = ["wasp", "wasp nest",
 "mosquito", "huge mosquito"]
 
 /* Used for scripted bosses, for `ranged_foes`,
 or when `prefer_ranged` is true. */
 var for_ranged_single_target = ["repeating",
-"wand"]
+"crossbow", "wand"]
 
 /* Weapons to use for ranged AoE. Ranged AoE is
 triggered by the same threshold as melee AoE. */
@@ -1270,7 +1278,7 @@ var elem_types = [
 ]
 var _2h_types = ["bardiche", "arm", "blade", 
 "heavy hammer", "repeating", "staff",
-"quarterstaff", "shovel"]
+"quarterstaff", "shovel", "crossbow"]
 var all_elems = [
   "aether", "fire", "ice", "poison", "vigor",
 ]
