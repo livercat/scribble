@@ -1,24 +1,25 @@
 var elemental_items = [
   ["hammer",
-    ["aether", "D", "dU+8", "dU+7"],
+    ["aether", "D",],
     ["poison", "D+7", "D+6"],
     ["ice", "D"],
-    ["default", "aether hammer D+8",
-    "aether hammer D+7"],
+    ["default", "stone hammer +7",
+                "aether hammer D"],
   ],
   ["wand",
     ["vigor", "D+8", "D+7"],
     ["default", "vigor wand D+8",
-    "vigor wand D+7"],
+                "vigor wand D+7"],
   ],
   ["sword",
-    ["aether", "D"],
+    ["aether", "D", "dU+9","dU+8"],
     ["fire", "D+7", "D+4", "dF"],
     ["ice", "dI"],
     ["poison", "dP", "D"],
     ["vigor", "D", "dL"],
-    ["default", "vigor sword dL",
-                "poison sword D"],
+    ["default", "aether sword dU+9",
+                "aether sword dU+8",
+                "vigor sword dL"],
   ],
   ["shield",
     ["vigor", "ah", "A"],
@@ -51,7 +52,7 @@ var do_stunlock = [
   "poena", "ceiling decorator"
   ]
 var stunlock_weapons = [
-  "aether hammer dU+8", "aether hammer dU+7"]
+  "aether hammer D", "stone hammer +7"]
 var unmaking_threshold = 600
 var debuff_bosses = "always"
 var debuff_non_bosses = "smite"
@@ -59,7 +60,7 @@ var useable_abilities = ["dash", "bash",
 "skeleton_arm", "mask", "blade", "hammer",
 "bardiche", "quarterstaff"]
 var use_potions_for_bosses = true
-var low_hp_threshold = 0.8
+var low_hp_threshold = 1
 var use_shield_on_low_hp = true
 var max_chill_stacks = 6
 var smite_treshold = 7
@@ -461,7 +462,6 @@ func select_weapon(range, aoe, elem,
   found_type = false
   var types = get_preferred_types(range, aoe)
   for ty : types
-    trace(ty)
     ?allow_2h | !is_2hander(ty)
       ?!elem_types.Contains(ty) &
       ^!is(purpose, "mod")
@@ -557,7 +557,8 @@ func can_use(ability)
 func should_drink()
   return use_potions_for_bosses &
   ^(item.potion="berserk"|item.potion="lucky")
-  ^& foe_dist<=melee_range
+  ^& foe_dist<=melee_range &
+  ^(get(my_statuses, "aspd_down") < 10)
 func drink()
   trace("drink")
   activate potion
@@ -597,6 +598,7 @@ func backflip()
   return equip_L("mind")
 func can_slap()
   return can_use("skeleton_arm") &
+  ^!(foe.id = "ice_pillar") &
   ^eff_dist < 7 & !phys_immune & can_activate()
 func should_slap()
   return can_slap() & (!pickpocket_quest |
@@ -634,7 +636,8 @@ func can_hammer()
   ^eff_dist <= 21 & can_activate()
 func should_hammer()
   ?!can_hammer() |
-  ^(foe.buffs.string = "poena_mirror")
+  ^(foe.buffs.string = "poena_mirror") |
+  ^get(my_statuses, "aspd_down") > 0
     return false
   var correct_enemy =
   ^(is_boss | can_aoe & eff_dist < 10)
@@ -653,7 +656,9 @@ func can_bard()
   return can_use("bardiche") & eff_dist <= 9 &
   ^!phys_immune & can_activate()
 func should_bard()
-  return is_boss & can_bard()
+  return is_boss &
+  ^get(my_statuses,"aspd_down") = 0 &
+  ^can_bard()
 var bard_frames = 30
 func bardiche()
   trace("bardiche")
@@ -823,9 +828,7 @@ func fight_mushrooms()
     :?foe_s = 32 & foe_t > (26 + delay) &
     ^can_mind
       return backflip()
-    ?use_abilities()
-      return true
-    :?should_drink()
+    ?should_drink()
       drink()
   auto_melee_boss()
 func fight_pallas()
@@ -837,18 +840,14 @@ func fight_pallas()
   :?foe = phase2
     ?foe.count > 2
       return ranged("aoe")
-    ?use_abilities()
-      return true
-    :?should_drink()
+    ?should_drink()
       drink()
   auto_melee_boss()
 func fight_bronze_guardian()
   ?foe_s = 32 & foe_t = 33 & armor < foe.damage
     return backflip()
   :?foe_s = 33
-    ?use_abilities()
-      return true
-    :?should_drink()
+    ?should_drink()
       drink()
     return auto_melee_boss()
   ranged("single")
@@ -863,20 +862,21 @@ func fight_hrimnir()
     return soft_block()
   :?draw.GetSymbol(56, 13) = "o" | is_boss &
   ^foe_s = 133
-    set_lock("boss", 2)
+    ?foe.count > 1
+      return ranged("aoe")
     return ranged("single")
   :?is_boss & foe_s = 132 & foe_t > 24
     set_lock("boss", 2)
     return auto_melee_boss()
   :?is_boss & foe_s = 142 & foe_t > 83
     set_lock("boss", 2)
+    ?foe.count > 1
+      return ranged("aoe")
     return ranged("single")
   :?is_boss & foe.count = 1
     ?foe.armor > 0
       return melee("dps")
-    ?foe_s ! 132 & !get(my_statuses, "slow") &
-    ^!get(my_statuses, "aspd_down") &
-    ^should_drink()
+    ?foe_s ! 132 & should_drink()
       drink()
     return auto_melee_boss()
   :?foe_dist < 8
@@ -1102,8 +1102,7 @@ func _parse_status(splt, i)
     n = get(my_statuses, "damage_down")
     set(my_statuses, "damage_down", n + num)
   :?aspd_debuffs.Contains(uid)
-    n = get(my_statuses, "aspd_down")
-    set(my_statuses, "aspd_down", n + num)
+    set(my_statuses, "aspd_down", dur)
   :?range_debuffs.Contains(uid)
     n = get(my_statuses, "range_down")
     set(my_statuses, "range_down", n + num)
