@@ -220,8 +220,6 @@ func auto_melee()
     return melee("def")
   return melee("dps")
 func melee(mode)
-  ?low_hp
-    trace("low_hp")
   trace("m_"+mode)
   ?dash_closer()
     return true
@@ -271,8 +269,6 @@ func auto_ranged()
     return ranged("single")
   return auto_melee()
 func ranged(mode)
-  ?low_hp
-    trace("low_hp")
   trace("r_"+mode)
   var aoe=is(mode,"aoe")
   ?!low_hp&should_unmake()
@@ -663,7 +659,7 @@ func should_smite()
   ^&foe_ehp<=smite_damage)&can_smite()
 func smite()
   trace("smite")
-  equip_R("blade")
+  aac("blade")
   return use("blade")
 func can_hammer()
   return can_use("hammer")&!phys_immune&
@@ -671,14 +667,13 @@ func can_hammer()
 func should_hammer()
   ?!can_hammer()
     return false
-  ?(is_boss|can_aoe&fd<10)&
-  ^(foe.armor>0|foe=spawner)
-    return true
-  return ok_foe&debuffing_allowed()
+  return (is_boss|can_aoe&fd<10)
+  ^&(foe.armor>0|foe=spawner|
+  ^debuffing_allowed())
 func hammer()
   trace("hammer")
   set_lock("hammer",hammer_frames)
-  equip_R("heavy hammer")
+  aac("heavy hammer")
   return use("hammer")
 func can_bard()
   return can_use("bardiche")&
@@ -693,13 +688,13 @@ func should_bard()
 func bardiche()
   trace("bardiche")
   set_lock("bardiche",bardiche_frames)
-  equip_R("bardiche")
+  aac("bardiche")
   return use("bardiche")
 func can_mask()
   return can_use("mask")&
   ^(foe!nagaraja)&can_activate()
 func should_mask()
-  return (is(mask_quest,"simple")|
+  return can_mask()&(is(mask_quest,"simple")|
   ^is_boss&fd<=melee_range)&
   ^!disable_debuffs&debuffing_allowed()
 func mask()
@@ -1367,7 +1362,8 @@ func draw_ui()
       >`@x@,@y+4@,@gray@,Dist: @fd@
       >`@x@,@y+5@,@gray@,Count: @fc@
     y=24
-    >`@x@,@y@,#blue,L: @lock@ (@lock_timer@)
+    >`@x@,@y@,#blue,L: @lock@ (@lock_timer@),
+    ^@can_mask()@,@should_mask()@
     >`@x@,@y+1@,@gray@,@loc.stars@*
     ^ @time.FormatDigital(totaltime)@
     ^/@time.FormatDigital(loc.averageTime)@
