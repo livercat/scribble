@@ -8,6 +8,9 @@ comment_re = re.compile("//.*")
 ops_re = re.compile(
     r" *(\||\/|\+|\-|\=|\&|\<|\>|\,|\!|\:(?!$)) *(?!(@|`|\?))", flags=re.MULTILINE
 )
+# braces_re = re.compile(
+#     r"\[\s*(.+?)\s*\]", flags=re.MULTILINE
+# )
 
 sep = """
 /*********************
@@ -22,12 +25,14 @@ def minimize():
     body = multiline_comment_re.sub("", parts[1])
     body = comment_re.sub("", body)
     body = ops_re.sub("\g<1>", body)
+    # body = braces_re.sub("\g<1>", body)
     new_body = []
     new_header = []
     new_min_header = []
     min_header = multiline_comment_re.sub("", parts[0])
     min_header = comment_re.sub("", min_header)
     min_header = ops_re.sub("\g<1>", min_header)
+    # min_header = braces_re.sub("\g<1>", min_header)
     for line in parts[0].splitlines():
         line = line.rstrip()
         new_header.append(line)
