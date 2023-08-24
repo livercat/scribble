@@ -946,7 +946,7 @@ func can_bard()
   ^can_activate()
 
 func should_bard()
-  return is_boss &
+  return lock = "bardiche" | is_boss &
   ^get(my_effects,"aspd_down") = 0 &
   ^(foe_ehp >= (bardiche_dmg * 2) | 
   ^foe_ehp < bardiche_dmg) &
@@ -1724,8 +1724,7 @@ func draw_ui()
       >`@x@,@y+4@,@gray@,Dist: @foe.distance@
       >`@x@,@y+5@,@gray@,Count: @foe.count@
     y = 24
-    >`@x@,@y@,#blue,L: @lock@ (@lock_timer@),
-    ^@can_mask()@,@should_mask()@
+    >`@x@,@y@,#blue,L: @lock@ (@lock_timer@)
     >`@x@,@y+1@,@gray@,@loc.stars@*
     ^ @time.FormatDigital(totaltime)@
     ^/@time.FormatDigital(loc.averageTime)@
