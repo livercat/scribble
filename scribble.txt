@@ -165,7 +165,7 @@ when `low_hp_threshold` */
 var use_shield_on_low_hp = true
 
 // Choose amount based on your `dI` weapon
-var max_chill_stacks = 1
+var max_chill_stacks = 6
 
 // When to use Cinder ability
 var max_ignition_stacks = 10
@@ -971,7 +971,7 @@ func fight_dysan()
     return auto_equip_R("melee",false)
   :?foe=phase3
     ?foe_s=115&evade_at(60)
-      set_lock("boss",5)
+      set_lock("boss",15)
       return true
     :?foe_s=32&around(49+delay)
       return soft_block()

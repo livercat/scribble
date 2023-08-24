@@ -67,7 +67,7 @@ var bardiche_dmg=375
 var use_potions_for_bosses=true
 var low_hp_threshold=1
 var use_shield_on_low_hp=true
-var max_chill_stacks=1
+var max_chill_stacks=6
 var max_ignition_stacks=10
 var cinderwisp_dmg=48
 var smite_treshold=7
@@ -837,7 +837,7 @@ func fight_dysan()
     return auto_equip_R("melee",false)
   :?foe=phase3
     ?foe_s=115&evade_at(60)
-      set_lock("boss",5)
+      set_lock("boss",15)
       return true
     :?foe_s=32&around(49+delay)
       return soft_block()
