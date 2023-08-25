@@ -262,12 +262,16 @@ func progress()
     return fight_bronze_guardian()
   :?loc=icy_ridge
     ?fi="ice_elemental_elite"
-      ?can_stunlock&
-      ^do_stunlock.Contains("ice elemental")
-        disable_r("mask")
-        disable_r("blade")
-        return stunlock()
-      return auto_melee_miniboss()
+      ?!at_boss
+        ?can_stunlock&
+        ^do_stunlock.Contains("ice elemental")
+          disable_r("mask")
+          disable_r("blade")
+          return stunlock()
+        :
+        return auto_melee_miniboss()
+      :
+        return ranged("aoe")
     return fight_hrimnir()
   :?loc=temple&
     ^is(fi,"acronian_cultist")
@@ -490,8 +494,7 @@ func fight_hrimnir()
   at_boss=true
   ?is_snowball_near()|
   ^(is_boss&fd<=6&
-  ^fs=32&ft>=
-  ^(23+chill_delay()))
+  ^fs=32&around(23+chill_delay()))
     ?useable_abilities.Contains("fire_talisman")
       equip_L("fire talisman")
     return soft_block()
@@ -605,7 +608,7 @@ func melee(mode)
   ?dash_closer()
     return true
   var aoe=is(mode,"aoe")
-  ?!low_hp&should_unmake()
+  ?should_unmake()
     ?try_equip_unmake("melee",aoe)
       mode="unmake"
   :?!low_hp&should_debuff()
