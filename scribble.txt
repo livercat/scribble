@@ -611,7 +611,7 @@ func melee(mode)
   ?should_unmake()
     ?try_equip_unmake("melee",aoe)
       mode="unmake"
-  :?!low_hp&should_debuff()
+  :?should_debuff()
     ?try_equip_debuff("melee",aoe)
       mode="debuff"
   ?is(mode,"dps")
@@ -652,10 +652,10 @@ func auto_ranged()
   return auto_melee()
 func ranged(mode)
   var aoe=is(mode,"aoe")
-  ?!low_hp&should_unmake()
+  ?should_unmake()
     ?try_equip_unmake("melee",aoe)
       mode="unmake"
-  :?!low_hp&should_debuff()
+  :?should_debuff()
     ?try_equip_debuff("ranged",aoe)
       return
   return auto_equip_dps("ranged",aoe)
