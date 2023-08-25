@@ -46,6 +46,7 @@ def process_release(header, body):
     header = header.replace("var enable_hit_tracking = true\n", "")
     header = header.replace("var enable_hit_tracking = false\n", "")
     body = body.replace("traces.Clear()", "")
+    body = body.replace("  enable_hit_tracking = false", "")
     body = dev_re.sub("", body)
     body = trace_re.sub("", body)
     body = minimize_safe(body)

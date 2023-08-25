@@ -1529,7 +1529,6 @@ func reset_loop()
   lock=false
   lock_timer=0
   unk_effects.Clear()
-  enable_hit_tracking=false
   at_boss=false
   naga_step=0
   last_state=0
