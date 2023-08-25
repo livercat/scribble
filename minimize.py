@@ -40,6 +40,7 @@ def minimize_safe(text):
 
 
 def process_release(header, body):
+    header = header.replace("var ui_show_debug = true", "var ui_show_debug = false")
     header = header.replace("var enable_tracing = true\n", "")
     header = header.replace("var enable_tracing = false\n", "")
     header = header.replace("var enable_hit_tracking = true\n", "")
@@ -61,6 +62,8 @@ def process_release(header, body):
 
 
 def process_debug(header, body):
+    header = header.replace("var enable_tracing = false", "var enable_tracing = true")
+    header = header.replace("var ui_show_debug = false", "var ui_show_debug = true")
     body = minimize_safe(body)
     new_body = []
     new_header = []

@@ -80,8 +80,8 @@ var mask_quest=false
 var idle_mask=false
 var ui_show_cd=true
 var ui_show_statuses=true
-var ui_show_debug=false
-var enable_tracing=false
+var ui_show_debug=true
+var enable_tracing=true
 var enable_hit_tracking=false
 func progress()
   ?pickup.distance<9
@@ -112,6 +112,9 @@ func progress()
       trace("miniboss")
       ?can_stunlock&
       ^do_stunlock.Contains("ceiling decorator")
+        disable_r("mask")
+        disable_r("blade")
+        disable_r("bardiche")
         return stunlock()
       return auto_melee_miniboss()
     :
@@ -133,6 +136,8 @@ func progress()
       trace("miniboss")
       ?can_stunlock&
       ^do_stunlock.Contains("ice elemental")
+        disable_r("mask")
+        disable_r("blade")
         return stunlock()
       return auto_melee_miniboss()
     return fight_hrimnir()
@@ -302,6 +307,8 @@ func fight_xyloalgia()
       return hard_block()
     return auto_melee_boss()
   :?foe=phase2
+    ?unsummon()
+      return true
     ?stunlock_poena
       excluded_items="dU"
       return stunlock()
@@ -361,11 +368,12 @@ func fight_bronze_guardian()
   ranged("single")
 func fight_hrimnir()
   at_boss=true
-  ?is_snowball_near()
-    return soft_block()
-  ?is_boss&fd<=6&
+  ?is_snowball_near()|
+  ^(is_boss&fd<=6&
   ^fs=32&ft>=
-  ^(23+chill_delay())
+  ^(23+chill_delay()))
+    ?useable_abilities.Contains("fire_talisman")
+      equip_L("fire talisman")
     return soft_block()
   :?draw.GetSymbol(56,13)="o"|is_boss&
   ^fs=133
@@ -494,6 +502,9 @@ func melee(mode)
     auto_equip_dps("melee",true)
   :?is(mode,"def")
     auto_equip_L("melee",false)
+    ?use_shield_on_low_hp
+      auto_equip_shield()
+    auto_equip_R("melee",false)
   return approach()
 func approach()
   var range=6
@@ -565,12 +576,6 @@ func check_stunlock()
 func stunlock()
   trace("stunlock")
   disable_r("skeleton_arm")
-  ?fi="cool_bat"
-    disable_r("mask")
-    disable_r("blade")
-    disable_r("bardiche")
-  ?fi="poena"&unsummon()
-    return true
   ?dash_closer()
     return true
   ?disable_debuffs
