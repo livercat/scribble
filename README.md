@@ -3,9 +3,9 @@
 Automation script for the Stone Story RPG.
 
 Equips weapons, uses abilities, deals with bosses!
-Also shows ability cooldowns and buff/debuff info.
+Also shows ability cooldowns and buff/debuff info in UI.
 
-Warning: this README and in the script itself contain a lot of spoilers and hidden game info, so don't read further if you don't want to be spoiled!
+Warning: this README and the script itself contain a lot of spoilers and hidden game info, so don't read further if you don't want to be spoiled!
 
 ## Features
 
@@ -18,7 +18,7 @@ to not slow your game down.
 debuffing bosses, helping with quests, and much more.
 1. Stunlock bosses and minibosses where it makes sense.
 1. Dodges all exploding enemies.
-1. Supportes all items with activated abilities, including all Lost items.
+1. Supports all items with activated abilities, including all Lost items.
 
 ## Non-goals and limitations
 
@@ -32,9 +32,9 @@ Finish main story to unlock the Mindstone
 
 ## How to use
 
-Copy contents of `scribble.txt` into your Mindstone, and configure your weapons and playstyle settings at the top of the script.
+Copy the contents of `scribble.txt` into your Mindstone, and configure your weapons and playstyle settings at the top of the script.
 
-Before you configure the settings, please read in-depth explanations below to understand what the script is trying to do .
+Before you configure the settings, please read in-depth explanations below to understand what the script is trying to accomplish.
 
 If you encounter a bug, you can use the `scribble.debug.txt` instead, which has a lot of diagnostics and debug info on screen, and record video of the incorrect script behavior with that - it will immensely speed up the bugfixing.
 
@@ -42,7 +42,7 @@ If you encounter a bug, you can use the `scribble.debug.txt` instead, which has 
 
 By default, the script prefers to use melee weapons, and only uses ranged for  scripted bosses, against specific enemies (like mosquitoes and wasps), and to debuff when you don't have melee debuffing weapons. However, there are multiple settings that can change this behavior. I will describe the default mode, and you can learn more about settings from the comments in the script itself.
 
-The script uses only the weapons and abilities that you explicitly configure in settings, so it won't use a random 0* +1 dP weapon you've got from a chest.
+The script uses only the weapons and abilities that you explicitly configure in the settings, so it won't use a random 0* +1 dP weapon you've got from a chest.
 
 ### Regular enemies
 
@@ -54,6 +54,8 @@ What script considers when selecting a weapon:
 - If you're on low HP, use lifestealing weapons and healing shields.
 - If it's a boss, or if you have the Smite buff, debuffs the enemy.
 - Uses `A` shields when approaching the enemy to get the armor.
+- Dashes with shields and quarterstaff as much as possible.
+- Unmakes high-HP enemies.
 
 ### Bosses
 
@@ -61,7 +63,7 @@ Script uses frame-perfect blocks and dodges almost everywhere. Since many attack
 
 #### Dysan
 
-Scout: just kills.
+Scout: the script just kills them.
 
 Phase 1: shield-blocks small attacks.
 
@@ -93,7 +95,7 @@ Phase 2: dodges the big swing.
 
 #### Pallas
 
-Big grave: uses ranged AoE
+Big grave: uses ranged AoE.
 
 Phase 1: shield-blocks the sword.
 
@@ -107,7 +109,7 @@ Guardian: uses ranged damage/debuffs when hammer is up, dodges the hit if you do
 
 #### Hrimnir
 
-Ice elemental: stunlock if possible.
+Ice elemental: stunlocks if possible.
 
 Hrimnir: shield-blocks snowballs (and uses fire talisman to reduce damage), uses unmaking weapons against the wall.
 
@@ -115,7 +117,7 @@ Help needed: this fight almost certainly can be improved, please let me know if 
 
 #### Nagaraja
 
-Cultist: just kills
+Cultist: just kills.
 
 Naga: dodges all poison balls in white and blue levels, tries to do it in yellow, but sometimes fails. Tries to dodge the boulder if Mind is off CD.
 
@@ -125,7 +127,7 @@ Help needed: yellow levels can use better positioning and dashes to avoid all po
 
 Since the mobile version doesn't support external imports, and Mindstone has a limit of 40kb of code, there are several versions of the script:
 
-- `scribble.txt` is the primary one for regular play.
+- `scribble.txt` is the primary script for regular play.
 - `scribble.debug.txt` has no comments in settings, but shows advanced script diagnostics to more easily debug problems.
 - `scribble.dev.txt` is the most complete one, with full code comments and readable code, but it doesn't fit in Mindstone and can't be used directly. I develop that version, and automatically generate `scribble.txt` and `scribble.debug.txt` from it (using the `minimize.py` Python script).
 

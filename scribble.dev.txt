@@ -18,7 +18,7 @@ var elemental_items = [
     ["poison", "D+8", "D+7"],
     ["ice", "D"],
     ["default",
-     "stone hammer +7","aether hammer D"],
+     "stone hammer +7", "aether hammer D"],
   ],
   ["wand",
     ["vigor", "D+8", "D+7"],
@@ -36,7 +36,7 @@ var elemental_items = [
      "vigor sword dL", "poison sword D"],
   ],
   ["shield",
-    ["vigor", "ah", "A"],
+    ["vigor", "A"],
     ["poison", "A"],
     ["ice", "A"],
     ["aether", "A"],
@@ -57,7 +57,7 @@ var special_weapons = ["bardiche", "blade",
 If a weapon type isn't listed here, it will not
 be used. */
 var for_melee_single_target = [
-  "sword", "big sword", "hammer",
+  "sword", "hammer",
 ]
 
 /* How many regular enemies are needed to start
@@ -67,7 +67,7 @@ var aoe_treshold = 4
 /* Weapons to use for melee AoE, same priority
 logic as the regular melee. */
 var for_melee_aoe = [
-  "arm", "bardiche", "big sword",
+"arm", "heavy hammer", "bardiche", "big sword",
 ]
 
 /* If this is set to `true`, script will prefer
@@ -91,7 +91,7 @@ var for_ranged_single_target = ["repeating",
 "crossbow", "wand"]
 
 /* Weapons to use for ranged AoE. Ranged AoE is
-triggered by the same threshold as melee AoE. */
+triggered by the same threshold as melee AoE.*/
 var for_ranged_aoe = ["wand", "staff"]
 
 /* Weapons to use against `immune_to_physical`
@@ -99,7 +99,8 @@ enemies. */
 var for_phys_immune = ["wand", "staff"]
 
 /* Full name of the shield with the highest
-evade%, will be used to block big boss attacks*/
+evade%, will be used to block big boss attacks
+*/
 var evade_shield = "vigor shield ah"
 
 /* Script will try to stunlock these enemies
@@ -107,15 +108,15 @@ instead of using any other tactics. Supported:
 poena, ceiling decorator, ice elemental. */
 var do_stunlock = [
   "poena", "ceiling decorator", "ice elemental"
-  ]
+]
 
 // Full names of weapons to use for stunlocking
 var stunlock_weapons = [
   "aether hammer D", "stone hammer +7"]
 
-/* How much HP a non-boss enemy must have to use
-dU weapons on it instead of other tactics. If 0,
-will not specifically unmake. */
+/* How much HP a non-boss enemy must have 
+to use dU weapons on it instead of other 
+tactics. If 0, will not specifically unmake. */
 var unmaking_threshold = 600
 
 /* When to debuff bosses:
@@ -140,7 +141,7 @@ var useable_abilities = ["dash", "bash",
 
 /* Advanced: these are default values, change 
 them accordingly if you have speed enchants on 
-these weapons */
+these weapons. */
 var hammer_frames = 15
 var bardiche_frames = 30
 

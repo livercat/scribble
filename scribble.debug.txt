@@ -22,7 +22,7 @@ var elemental_items=[
      "vigor sword dL","poison sword D"],
   ],
   ["shield",
-    ["vigor","ah","A"],
+    ["vigor","A"],
     ["poison","A"],
     ["ice","A"],
     ["aether","A"],
@@ -33,11 +33,11 @@ var elemental_items=[
 var special_weapons=["bardiche","blade",
 "heavy hammer","repeater","arm"]
 var for_melee_single_target=[
-  "sword","big sword","hammer",
+  "sword","hammer",
 ]
 var aoe_treshold=4
 var for_melee_aoe=[
-  "arm","bardiche","big sword",
+"arm","heavy hammer","bardiche","big sword",
 ]
 var prefer_ranged=false
 var prefer_ranged_foes=[]
@@ -50,7 +50,7 @@ var for_phys_immune=["wand","staff"]
 var evade_shield="vigor shield ah"
 var do_stunlock=[
   "poena","ceiling decorator","ice elemental"
-  ]
+]
 var stunlock_weapons=[
   "aether hammer D","stone hammer+7"]
 var unmaking_threshold=600

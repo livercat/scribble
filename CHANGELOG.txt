@@ -1,7 +1,9 @@
 Version 1.3
-  - Reorganized and expanded settings
-  - 
+  - Another major rework, basically a rewrite
   - Automatic AAC for 2-handed weapons
+  - Stunlocking
+  - Fixed all boss fights, including yellow levels
+  - A lot, lot more
 
 Version 1.2.1
   - Fixed weapon switcher not respecting
@@ -24,7 +26,7 @@ Version 1.2
  - Improved many boss fights and regular locations
  - BROKEN: Dysangelos fight is currently quite broken,
    I'll fix it sometime soon.
-   
+
 Version 1.1
 - Major reorganization and clean up
 - Added more code comments
