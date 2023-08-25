@@ -1,4 +1,17 @@
-/* Set up your elemental and default items */
+/* Set up your elemental and default items.
+Format is:
+["weapon type", 
+  ["element", "item1 mods", "item2 mods"], etc]
+Mods should be written exactly as in game, so
+they will be equipped correctly.
+Default items are used if you don't have a 
+correct element against the foe, or if it's a 
+non-elemental foe. Default items should be 
+written as full names.
+List items for the particular element in the 
+order from the best to the worst. You can omit
+whole elements and weapon types if you don't 
+want the script to use them. */
 var elemental_items = [
   ["hammer",
     ["aether", "D",],
@@ -36,21 +49,6 @@ weapon types in the lists below. */
 var special_weapons = ["bardiche", "blade",
 "heavy hammer", "repeater", "arm"]
 
-/* By default script prefers to use melee, and
-only uses ranged for scripted bosses, against
-specific enemies like mosquitoes and wasps.
-What script considers when selecting a weapon
-by default:
-1. Match the foe's weak element.
-2. Use hammers or heavy hammer if foe has armor.
-3. Use single-target or AoE weapons based on
-   `foe.count`.
-4. If you're on low HP, use lifestealing
-   weapons and healing shields.
-5. If it's a boss, or if you have the Smite
-   buff, debuffs the enemy.
-Settings below can change this logic. */
-
 /* Weapon type priority for single targets:
 1. First type + foe's weak element.
 2. Default weapon of the first type.
@@ -77,8 +75,9 @@ to use ranged items from lists below instead of
 melee. */
 var prefer_ranged = false
 
-/* Will prefer st/aoe ranged for these enemies,
-but will try to get in melee if they are near */
+/* Will prefer ranged weapons only for these 
+enemies, but will try to get in melee if they
+are near */
 var prefer_ranged_foes = []
 
 /* Will exclusively use single-target ranged
@@ -146,28 +145,30 @@ var hammer_frames = 15
 var bardiche_frames = 30
 
 /* `dmg * crit_mult`, script won't use the 
-bardiche ability if foe's HP is lower than
+bardiche ability if non-boss's HP is lower than
 twice this damage */
 var bardiche_dmg = 500
 
 /* Use scripted potions for bosses. */
-var use_potions_for_bosses = true
+var use_potions_for_bosses = false
 
 /* Fraction of HP to consider low. When on low 
 HP, will prioritize `ah` shield and `dL` weapon 
 over foe's elemental weakness.
-If 1, will always try to lifesteal to max.
+If 1, will always try to lifesteal to max 
+  (useful for clearing zones with full HP).
 If 0, will never force lifesteal. */
-var low_hp_threshold = 1
+var low_hp_threshold = 0.5
 
 /* Switch to 1h+shield against non-boss foes
-when `low_hp_threshold` */
+when `low_hp_threshold` is reached */
 var use_shield_on_low_hp = true
 
 // Choose amount based on your `dI` weapon
 var max_chill_stacks = 6
 
-// When to use Cinder ability
+/* When to use Cinder ability (if listed in
+`useable_abilities`) */
 var max_ignition_stacks = 10
 var cinderwisp_dmg = 48
 
@@ -204,7 +205,7 @@ long as the debuff lasts, and quit the zone. */
 var mask_quest = false
 
 /* Wear the cultist mask out of combat. For some
-reason. */
+reason ;) */
 var idle_mask = false
 
 // Show ability cooldowns in UI
