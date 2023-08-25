@@ -144,10 +144,10 @@ these weapons */
 var hammer_frames = 15
 var bardiche_frames = 30
 
-/* `dmg * crit_mult`, script won't use the
-bardiche ability if non-boss's HP is lower than
-twice this damage */
-var bardiche_dmg = 500
+/* `dmg * (crit_mult + base_crit_mult)`,
+script won't use the bardiche ability if
+non-boss's HP is lower than twice this damage*/
+var bardiche_dmg = 52 * (7.6 + 2)
 
 /* Use scripted potions for bosses. */
 var use_potions_for_bosses = false
@@ -168,9 +168,10 @@ var use_shield_on_low_hp = true
 var max_chill_stacks = 6
 
 /* When to use Cinder ability (if listed in
-`useable_abilities`) */
+`useable_abilities`). Will use at max_stacks,
+or if boss's HP is lower than stacks * dmg. */
 var max_ignition_stacks = 10
-var cinderwisp_dmg = 48
+var cinderwisp_dmg = 24
 
 /* At least this many enemies must be present
 to use Smite ability. */
