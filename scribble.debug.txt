@@ -512,7 +512,7 @@ func melee(mode)
 func approach()
   var range=6
   ?found_type
-    range=get(weapon_ranges,found_type)
+    range=get(weapon_ranges,found_type)+1
   ?fd>range
     trace("approach")
     ?is_2hander(found_type)

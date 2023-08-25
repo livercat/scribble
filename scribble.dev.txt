@@ -745,7 +745,7 @@ func melee(mode)
 func approach()
   var range = 6
   ?found_type
-    range = get(weapon_ranges, found_type)
+    range = get(weapon_ranges, found_type) + 1
   ?foe.distance > range
     trace("approach")
     // use shield while walking closer

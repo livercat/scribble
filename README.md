@@ -127,7 +127,7 @@ Since the mobile version doesn't support external imports, and Mindstone has a l
 
 - `scribble.txt` is the primary one for regular play.
 - `scribble.debug.txt` has no comments in settings, but shows advanced script diagnostics to more easily debug problems.
-- `scribble.dev.txt` is the most complete one, wich full code comments and readable code, but it doesn't fit in Mindstone and can't be used directly. I develop in that version, and automatically generate `scribble.txt` and `scribble.debug.txt` from it (using the `minimize.py` Python script).
+- `scribble.dev.txt` is the most complete one, with full code comments and readable code, but it doesn't fit in Mindstone and can't be used directly. I develop that version, and automatically generate `scribble.txt` and `scribble.debug.txt` from it (using the `minimize.py` Python script).
 
 I use VSCode with a [syntax highlighter](https://marketplace.visualstudio.com/items?itemName=Catalyst-42.c42-stonescript) for StoneScript. I also set `"editor.rulers": [48]` in settings to make it easier to respect Mindstone line limit of 48 characters.
 
