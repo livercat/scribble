@@ -40,6 +40,10 @@ def minimize_safe(text):
 
 
 def process_release(header, body):
+    header = header.replace("var enable_tracing = true\n", "")
+    header = header.replace("var enable_tracing = false\n", "")
+    header = header.replace("var enable_hit_tracking = true\n", "")
+    header = header.replace("var enable_hit_tracking = false\n", "")
     body = body.replace("traces.Clear()", "")
     body = dev_re.sub("", body)
     body = trace_re.sub("", body)
@@ -72,19 +76,19 @@ def process_debug(header, body):
 
 
 def minimize():
-    with open("dev.scribble.txt", mode="r", encoding="utf-8") as f:
+    with open("scribble.dev.txt", mode="r", encoding="utf-8") as f:
         whole = f.read()
     parts = whole.split(sep)
     release_header, release_body = process_release(parts[0], parts[1])
     debug_header, debug_body = process_debug(minimize_safe(parts[0]), parts[1])
     with open("scribble.txt", mode="w", encoding="utf-8") as f:
         f.write("\n".join(release_header) + "\n\n" + "\n".join(release_body))
-    with open("min.txt", mode="w", encoding="utf-8") as f:
+    with open("scribble.debug.txt", mode="w", encoding="utf-8") as f:
         f.write("\n".join(debug_header) + "\n" + "\n".join(debug_body))
-    for fname in ("dev.scribble.txt", "scribble.txt", "min.txt"):
+    for fname in ("scribble.dev.txt", "scribble.txt", "scribble.debug.txt"):
         size = os.stat(fname).st_size / 1024
-        print(f"{fname.rjust(len('dev.scribble.txt'))}: {size} kb")
-        if not fname.startswith("dev") and size > 40:
+        print(f"{fname.rjust(len('scribble.debug.txt'))}: {size} kb")
+        if not "dev" in fname and size > 40:
             print(f"WARNING: {fname} is over 40kb!")
 
 
