@@ -117,7 +117,7 @@ Help needed: this fight almost certainly can be improved, please let me know if 
 
 Cultist: just kills
 
-Naga: dodges all poison balls in white and blue levels, tries to do it in yellow, but sometimes fails. Tris to dodge the boulder if Mind is off CD.
+Naga: dodges all poison balls in white and blue levels, tries to do it in yellow, but sometimes fails. Tries to dodge the boulder if Mind is off CD.
 
 Help needed: yellow levels can use better positioning and dashes to avoid all poison, please let me know if you have ideas for strategies.
 
