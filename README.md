@@ -33,6 +33,7 @@ Finish main story to unlock the Mindstone
 ## How to use
 
 Copy contents of `scribble.txt` into your Mindstone, and configure your weapons and playstyle settings at the top of the script.
+
 Before you configure the settings, please read in-depth explanations below to understand what the script is trying to do .
 
 If you encounter a bug, you can use the `scribble.debug.txt` instead, which has a lot of diagnostics and debug info on screen, and record video of the incorrect script behavior with that - it will immensely speed up the bugfixing.
@@ -61,41 +62,53 @@ Script uses frame-perfect blocks and dodges almost everywhere. Since many attack
 #### Dysan
 
 Scout: just kills.
+
 Phase 1: shield-blocks small attacks.
+
 Phase 2: uses appropriate element in the main-hand, debuffs with the off-hand, uses abilities only when safe. Last-hits with the Smite to get 1 stack of it for the next phase.
+
 Phase 3: dodges stun and ray, switches weapons based on current boss resistance buff.
 
 #### Xylo & Poena
 
 Wasp nest: uses single-target ranged.
+
 Xylo: dodges the root (or blocks if Mind is on CD).
+
 Poena: either stunlocks if you have the weapons to do it, or respects the mirror to slowly chip away if you don't.
 
 #### Bolesh
 
 Ceiling decorator: stunlocks if possible.
+
 Bolesh: nukes in melee until he gets a damage buff, then switches to ranged.
 
 #### Mushrooms
 
 Snail & Puff: kills and dodges respectively.
+
 Phase 1: dodges big swing, shield-blocks pellets.
+
 Phase 2: dodges the big swing.
 
 #### Pallas
 
 Big grave: uses ranged AoE
+
 Phase 1: shield-blocks the sword.
+
 Phase 2: uses magic damage to kill summoned Booos.
 
 #### Bronze Guardian
 
 Bomb: dodges
+
 Guardian: uses ranged damage/debuffs when hammer is up, dodges the hit if you don't have enough armor to block, nukes in melee while the hammer is down.
 
 #### Hrimnir
 
 Ice elemental: stunlock if possible.
+
 Hrimnir: shield-blocks snowballs (and uses fire talisman to reduce damage), uses unmaking weapons against the wall.
 
 Help needed: this fight almost certainly can be improved, please let me know if you have ideas for strategies.
@@ -103,6 +116,7 @@ Help needed: this fight almost certainly can be improved, please let me know if 
 #### Nagaraja
 
 Cultist: just kills
+
 Naga: dodges all poison balls in white and blue levels, tries to do it in yellow, but sometimes fails. Tris to dodge the boulder if Mind is off CD.
 
 Help needed: yellow levels can use better positioning and dashes to avoid all poison, please let me know if you have ideas for strategies.

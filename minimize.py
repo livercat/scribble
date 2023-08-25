@@ -64,6 +64,9 @@ def process_release(header, body):
 def process_debug(header, body):
     header = header.replace("var enable_tracing = false", "var enable_tracing = true")
     header = header.replace("var ui_show_debug = false", "var ui_show_debug = true")
+    header = header.replace(
+        "var enable_hit_tracking = true", "var enable_hit_tracking = false"
+    )
     body = minimize_safe(body)
     new_body = []
     new_header = []
