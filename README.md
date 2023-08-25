@@ -3,16 +3,28 @@
 Automation script for the Stone Story RPG.
 
 Equips weapons, uses abilities, deals with bosses!
-Also shows ability cooldowns and buff/debuff info.
+Also shows ability cooldowns and buff/debuff info in UI.
 
-Pull requests and bug reports are very welcome.
+Warning: this README and the script itself contain a lot of spoilers and hidden game info, so don't read further if you don't want to be spoiled!
 
 ## Features
 
-1. Efficient combat: chooses weapons based on enemy element and location, uses item abilities when appropriate, and handles boss mechanics.
-1. Minimalistic UI: shows your buffs/debuffs, ability cooldowns, and enemy info (disabled by default). All of these can be disabled individually.
-1. Blazing fast: uses early returns and branched ifs (:?) where possible. If you feel your game is noticeably slow with this script, please let me know by creating an issue!
-1. Highly modular: most of the functionality is contained in descriptively named (and sometimes documented) functions, so you can reuse parts of this script for your own scripts.
+1. Efficient combat: chooses weapons based on enemy element and location, uses item abilities when appropriate, and intelligently handles boss mechanics.
+1. Optional UI: shows your buffs/debuffs, ability cooldowns, and extended enemy info (disabled by default). All of these can be individually hidden.
+1. Blazing fast: caches computations where possible, and uses efficient branching
+to not slow your game down.
+1. Aimed at players with moderate gear: 8-10* with +5 to +10 enchants, nothing fancy.
+1. Supports advanced mechanics which are broadly applicable regardless of your gear level: double-screen smite, `ai.idle` AAC for 2-handed melee weapons,
+debuffing bosses, helping with quests, and much more.
+1. Stunlock bosses and minibosses where it makes sense.
+1. Dodges all exploding enemies.
+1. Supports all items with activated abilities, including all Lost items.
+
+## Non-goals and limitations
+
+1. Doesn't support advanced AAC (one-handed weapons, frame-perfect cancelling, or HP tracking).
+1. Not tested with high-level gear, which might have completely different playstyles and approaches.
+1. Only tested on iOS version, but should work everywhere.
 
 ## Prerequisites
 
@@ -20,77 +32,110 @@ Finish main story to unlock the Mindstone
 
 ## How to use
 
-Copy contents of `scribble.txt` into your Mindstone and configure your weapons and runtime settings at the top
+Copy the contents of `scribble.txt` into your Mindstone, and configure your weapons and playstyle settings at the top of the script.
 
-## Limitations
+Before you configure the settings, please read in-depth explanations below to understand what the script is trying to accomplish.
 
-- Only tested on iOS version
-- Mobile version doesn't support arbitrary `import`s, so all code is contained in a single file.
-- Tested mostly on blue-level zones (6 to 10 stars) and a bit on white-levels (1-5) and very little in yellow (11+)
-- Only the following Lost Items are supported (because I don't have the rest): `Skeleton Arm`, `Bashing Shield`, `Blade of the Fallen God`, `Cultist Mask`
-- Doesn't do AAC for normal weapons, only for specials (heavy hammer, bardiche, skeleton arm). If you don't know what AAC is, don't worry about it :)
-- Doesn't support potions besides Healing and Vampiric
+If you encounter a bug, you can use the `scribble.debug.txt` instead, which has a lot of diagnostics and debug info on screen, and record video of the incorrect script behavior with that - it will immensely speed up the bugfixing.
+
+## In-depth explanations
+
+By default, the script prefers to use melee weapons, and only uses ranged for  scripted bosses, against specific enemies (like mosquitoes and wasps), and to debuff when you don't have melee debuffing weapons. However, there are multiple settings that can change this behavior. I will describe the default mode, and you can learn more about settings from the comments in the script itself.
+
+The script uses only the weapons and abilities that you explicitly configure in the settings, so it won't use a random 0* +1 dP weapon you've got from a chest.
+
+### Regular enemies
+
+What script considers when selecting a weapon:
+
+- Match the foe's weak element.
+- Use hammers or heavy hammer if the foe has armor.
+- Use single-target or AoE weapons based on `foe.count`.
+- If you're on low HP, use lifestealing weapons and healing shields.
+- If it's a boss, or if you have the Smite buff, debuffs the enemy.
+- Uses `A` shields when approaching the enemy to get the armor.
+- Dashes with shields and quarterstaff as much as possible.
+- Unmakes high-HP enemies.
+
+### Bosses
+
+Script uses frame-perfect blocks and dodges almost everywhere. Since many attacks depend on the amount of chill stacks on the enemy, script tries to take it into account, but sometimes the chill falls off in the exact wrong moment, and the dodge/block fails.
+
+#### Dysan
+
+Scout: the script just kills them.
+
+Phase 1: shield-blocks small attacks.
+
+Phase 2: uses appropriate element in the main-hand, debuffs with the off-hand, uses abilities only when safe. Last-hits with the Smite to get 1 stack of it for the next phase.
+
+Phase 3: dodges stun and ray, switches weapons based on current boss resistance buff.
+
+#### Xylo & Poena
+
+Wasp nest: uses single-target ranged.
+
+Xylo: dodges the root (or blocks if Mind is on CD).
+
+Poena: either stunlocks if you have the weapons to do it, or respects the mirror to slowly chip away if you don't.
+
+#### Bolesh
+
+Ceiling decorator: stunlocks if possible.
+
+Bolesh: nukes in melee until he gets a damage buff, then switches to ranged.
+
+#### Mushrooms
+
+Snail & Puff: kills and dodges respectively.
+
+Phase 1: dodges big swing, shield-blocks pellets.
+
+Phase 2: dodges the big swing.
+
+#### Pallas
+
+Big grave: uses ranged AoE.
+
+Phase 1: shield-blocks the sword.
+
+Phase 2: uses magic damage to kill summoned Booos.
+
+#### Bronze Guardian
+
+Bomb: dodges
+
+Guardian: uses ranged damage/debuffs when hammer is up, dodges the hit if you don't have enough armor to block, nukes in melee while the hammer is down.
+
+#### Hrimnir
+
+Ice elemental: stunlocks if possible.
+
+Hrimnir: shield-blocks snowballs (and uses fire talisman to reduce damage), uses unmaking weapons against the wall.
+
+Help needed: this fight almost certainly can be improved, please let me know if you have ideas for strategies.
+
+#### Nagaraja
+
+Cultist: just kills.
+
+Naga: dodges all poison balls in white and blue levels, tries to do it in yellow, but sometimes fails. Tries to dodge the boulder if Mind is off CD.
+
+Help needed: yellow levels can use better positioning and dashes to avoid all poison, please let me know if you have ideas for strategies.
 
 ## Development
 
-I use VSCode with a [syntax highlighter](https://marketplace.visualstudio.com/items?itemName=Catalyst-42.c42-stonescript) for StoneScript. I also set `"editor.rulers": [49]` in settings to make it easier to respect Mindstone line limit of 49 characters - remember that you always can split a long line into several lines:
-```
-something
-^like
-^this
-```
-Some variable names are shorter than I would prefer for readability, but Mindstone has line limit of 49 chars (actually it might be 48, need to check).
+Since the mobile version doesn't support external imports, and Mindstone has a limit of 40kb of code, there are several versions of the script:
 
-I use a mix of function arguments and global variables for various pieces of logic. I would prefer not to use global vars at all 
-to make it harder to miss something and easier to follow the logic, but since we don't have optional or default arguments,
-functions would have very ugly signatures. So func argument are used for weapon switching where it's important to make sure everything
-lines up correctly.
+- `scribble.txt` is the primary script for regular play.
+- `scribble.debug.txt` has no comments in settings, but shows advanced script diagnostics to more easily debug problems.
+- `scribble.dev.txt` is the most complete one, with full code comments and readable code, but it doesn't fit in Mindstone and can't be used directly. I develop that version, and automatically generate `scribble.txt` and `scribble.debug.txt` from it (using the `minimize.py` Python script).
 
-I also use a mix of conditional branching (:?) and early returns. Early returns reduce line lenght and make funcs more readable. They are neat!
-
-Main logic is in following functions:
-prelude() - collects info from game state
-  into global vars
-progress() - entry point for combat logic
-  and boss handling
-fight() - main logic for choosing range and
-  fighting special non-boss enemies
-melee(), ranged(), elemental() - equip
-  appropriate weapons
-draw_ui() - draws UI :)
+I use VSCode with a [syntax highlighter](https://marketplace.visualstudio.com/items?itemName=Catalyst-42.c42-stonescript) for StoneScript. I also set `"editor.rulers": [48]` in settings to make it easier to respect Mindstone line limit of 48 characters.
 
 If you also play on mobile, please don't use in-game UI to write your code! It's fine for small adjustments, but for writing actual logic it's very inconvenient. Use a mobile programming editor, or even basic text editor/notes app, it will make your life less painful.
 
-## Notes on weapon naming
-
-Each elemental weapon aside from staffs and warhammers has two variants: "D" or "dX",
-where "X" is the elemental modifier ("A" and "ax" for shields). Staffs and warhammers instead have six!
-
-"A", "D", "ax", "aX", "dx", "dX".
-
-You can mutate between them using moondial.
-
-Meaning of letters in suffix:
-"A": get armor on egage for each foe
-"D": attack bonus vs correct element
-"x": on being hit, chance to: unmake (aether),
-     fire dot, chill (ice), +attack (poison),
-     heal (vigor)
-"X": on attack, chance to: unmake (aether),
-     fire dot, chill (ice), lifesteal (vigor),
-     reduce foe attack (poison)
-
-Full list of suffixes:
-Defensive: staffs, warhammers, shields
-  "au", "af", "ai", "ap", "ah", "A"
-Offensive: staffs, warhammers, swords, xbows
-  "dU", "dF", "dI", "dP", "dL", "D"
-Exclusive to staffs and warhammers:
-  "aU", "aF", "aI", "aP", "aL",
-  "du", "df", "di", "dp", "dh"
-
-Note that vigor has 2 different letters: "L" for offensive lifesteal and "h" for defensive "heal on being hit".
-There are no "l" or "H" modifiers.
+To copy the script from the PC to mobile, I use an online notepad sharing site - there is a lot of them, with varying level of sketchinnes. I can't recommend any one in particular, use the one you like.
 
 ## Screenshot
 
