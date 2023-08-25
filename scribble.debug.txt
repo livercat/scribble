@@ -63,8 +63,8 @@ var useable_abilities=["dash","bash",
 var hammer_frames=15
 var bardiche_frames=30
 var bardiche_dmg=52 * (7.6+2)
-var use_potions_for_bosses=false
-var low_hp_threshold=0.5
+var use_potions_for_bosses=true
+var low_hp_threshold=1
 var use_shield_on_low_hp=true
 var max_chill_stacks=6
 var max_ignition_stacks=10
@@ -81,7 +81,7 @@ var idle_mask=false
 var ui_show_cd=true
 var ui_show_statuses=true
 var ui_show_debug=true
-var enable_tracing=true
+var enable_tracing=false
 var enable_hit_tracking=false
 func progress()
   ?pickup.distance<9

@@ -151,7 +151,7 @@ non-boss's HP is lower than twice this damage*/
 var bardiche_dmg = 52 * (7.6 + 2)
 
 /* Use scripted potions for bosses. */
-var use_potions_for_bosses = false
+var use_potions_for_bosses = true
 
 /* Fraction of HP to consider low. When on low 
 HP, will prioritize `ah` shield and `dL` weapon 
@@ -159,7 +159,7 @@ over foe's elemental weakness.
 If 1, will always try to lifesteal to max 
   (useful for clearing zones with full HP).
 If 0, will never force lifesteal. */
-var low_hp_threshold = 0.5
+var low_hp_threshold = 1
 
 /* Switch to 1h+shield against non-boss foes
 when `low_hp_threshold` is reached */
