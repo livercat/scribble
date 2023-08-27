@@ -18,22 +18,27 @@ var elemental_items = [
     ["poison", "D+8", "D+7"],
     ["ice", "D"],
     ["default",
-     "stone hammer +7", "aether hammer D"],
+     "poison hammer D+8", "aether hammer D",
+     "stone hammer +7"],
   ],
   ["wand",
     ["vigor", "D+8", "D+7"],
+    ["poison", "dP"],
+    ["fire", "dF"],
+    ["ice", "dI"],
     ["default", 
-    "vigor wand D+8", "vigor wand D+7"],
+    "vigor wand D+8", "vigor wand D+7", 
+    "poison wand dP"],
   ],
   ["sword",
     ["aether", "dU+9","dU+8"],
-    ["fire", "D+7", "dF"],
+    ["fire", "D+8", "dF"],
     ["ice", "dI"],
     ["poison", "dP", "D"],
     ["vigor", "D", "dL+10", "dL+9"],
     ["default", 
-     "aether sword dU+9", "aether sword dU+8",
-     "vigor sword dL", "poison sword D"],
+     "vigor sword dL+10", "aether sword dU+9",
+     "fire sword D+8", "poison sword D+7"],
   ],
   ["shield",
     ["vigor", "A"],
@@ -67,7 +72,7 @@ var aoe_treshold = 4
 /* Weapons to use for melee AoE, same priority
 logic as the regular melee. */
 var for_melee_aoe = [
-"arm", "heavy hammer", "bardiche", "big sword",
+"arm", "bardiche", "big sword",
 ]
 
 /* If this is set to `true`, script will prefer
@@ -310,8 +315,9 @@ func progress()
     return fight_hrimnir()
 
   :?loc = temple & 
-    ^is(foe.id, "acronian_cultist")
+  ^is(foe.id, "acronian_cultist")
     trace("miniboss")
+    excluded_items = "vigor"
     return auto_melee_miniboss()
 
   :?loc = nagaraja
@@ -448,6 +454,7 @@ func fight_dysan()
       return equip_R(found)
     return auto_equip_R("melee", false)
   :?foe = phase3
+    weak_elem = "default"
     hit = 20 + math.Max(0, delay-6)
     // hammer him right as he gets armor
     ?foe.state=32 & foe.time>hit & dysan_step=0
@@ -781,6 +788,10 @@ func auto_ranged()
 func ranged(mode)
   trace("r_" + mode)
   var aoe = is(mode, "aoe")
+  ?!aoe & must_ranged_foe() & 
+  ^for_ranged_single_target.
+  ^Contains("repeating")
+    return equip_L("repeating")
   ?should_unmake()
     ?try_equip_unmake("melee", aoe)
       trace("unmaking")
@@ -833,7 +844,8 @@ func stunlock()
   /* Now stunlock, and use abilities when
   it's safe */
   var stunned = get(foe_effects, "stun")
-  ?can_hammer() | is(lock, "hammer")
+  ?(can_hammer() & foe.distance < 15) |
+  ^is(lock, "hammer")
     return hammer() // long stun
   :?(stunned > bardiche_frames + 10) &
   ^should_bard() | is(lock, "bardiche")
@@ -845,7 +857,7 @@ func stunlock()
       return smite()
     ?should_mask()
       return mask()
-  :?stunned <= 3 & !disable_debuffs
+  :?stunned <= 3
     ?get_cd("bash") <= 0 & foe.distance < 10 &
     ^foe_ehp > 100 & can_backflip() 
       return backflip()
