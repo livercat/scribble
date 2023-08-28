@@ -1,10 +1,9 @@
 var elemental_items=[
   ["hammer",
-    ["aether","D",],
+    ["aether","D+10","D+8"],
     ["poison","D+8","D+7"],
-    ["ice","D"],
     ["default",
-     "poison hammer D+8","aether hammer D",
+     "aether hammer D+10","poison hammer D+8",
      "stone hammer+7"],
   ],
   ["wand",
@@ -16,15 +15,8 @@ var elemental_items=[
     "vigor wand D+8","vigor wand D+7",
     "poison wand dP"],
   ],
-  ["sword",
-    ["aether","dU+9","dU+8"],
-    ["fire","D+11","D+8","dF"],
-    ["ice","D+9","D+7","dI"],
-    ["poison","D","dP"],
-    ["vigor","D","dL+10","dL+9"],
-    ["default",
-     "fire sword D+11","vigor sword dL+10",
-     "aether sword dU+9","poison sword D+7"],
+  ["big sword",
+    ["aether","dU+2","dU+1"]
   ],
   ["shield",
     ["vigor","A"],
@@ -38,7 +30,7 @@ var elemental_items=[
 var special_weapons=["bardiche","blade",
 "heavy hammer","repeater","arm"]
 var for_melee_single_target=[
-  "sword","hammer",
+  "big sword","hammer",
 ]
 var aoe_treshold=4
 var for_melee_aoe=[
@@ -650,6 +642,7 @@ func equip_L(it)
   _equip_L=it
   ?is_2hander(it)|is_2hander(found_type)
     return aac(it)
+  trace("equip_L("+it+")")
   equipL @it@
   return it
 var _equip_R=false
@@ -657,6 +650,7 @@ func equip_R(it)
   _equip_R=it
   ?is_2hander(it)|is_2hander(found_type)
     return aac(it)
+  trace("equip_R("+it+")")
   equipR @it@
   return it
 func is_2hander(ty)
@@ -699,7 +693,7 @@ func auto_equip_dps(range,aoe)
     return equip_R(found)
   return false
 func find_dps_weapon(range,aoe,allow_2h)
-  trace("sel_dps_weapon")
+  trace("find_dps_weapon")
   found=false
   ?low_hp
     found=find_weapon(range,aoe,
@@ -740,7 +734,7 @@ func try_equip_debuff(range,aoe)
     return auto_equip_R(range,aoe)
 func find_debuff_weapon(range,aoe,
 ^elem,allow_2h)
-  trace("sel_debuff_wep")
+  trace("find_debuff_wep")
   found=find_weapon(range,aoe,
   ^elem,"mod",allow_2h)
   ?!found&range="melee"&!must_melee_foe()
@@ -763,7 +757,7 @@ func try_equip_unmake(range,aoe)
     return equip_R(found)
   return auto_equip_R()
 func find_unmake_weapon(range,aoe,allow_2h)
-  trace("sel_unmake_wep")
+  trace("find_unmake_wep")
   found=find_weapon(range,false,
   ^"aether","mod",allow_2h)
   ?!found&range="melee"

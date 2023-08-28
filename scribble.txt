@@ -14,11 +14,10 @@ whole elements and weapon types if you don't
 want the script to use them. */
 var elemental_items = [
   ["hammer",
-    ["aether", "D",],
+    ["aether", "D+10", "D+8"],
     ["poison", "D+8", "D+7"],
-    ["ice", "D"],
     ["default",
-     "poison hammer D+8", "aether hammer D",
+     "aether hammer D+10", "poison hammer D+8",
      "stone hammer +7"],
   ],
   ["wand",
@@ -30,15 +29,18 @@ var elemental_items = [
     "vigor wand D+8", "vigor wand D+7",
     "poison wand dP"],
   ],
-  ["sword",
-    ["aether", "dU+9","dU+8"],
-    ["fire", "D+11", "D+8", "dF"],
-    ["ice", "D+9", "D+7", "dI"],
-    ["poison", "D", "dP"],
-    ["vigor", "D", "dL+10", "dL+9"],
-    ["default",
-     "fire sword D+11", "vigor sword dL+10",
-     "aether sword dU+9", "poison sword D+7"],
+  // ["sword",
+  //   ["aether", "dU+9","dU+8"],
+  //   ["fire", "D+11", "D+8", "dF"],
+  //   ["ice", "D+9", "D+7", "dI"],
+  //   ["poison", "D", "dP"],
+  //   ["vigor", "D", "dL+10", "dL+9"],
+  //   ["default",
+  //    "fire sword D+11", "vigor sword dL+10",
+  //    "aether sword dU+9", "poison sword D+7"],
+  // ],
+  ["big sword",
+    ["aether", "dU + 2", "dU + 1"]
   ],
   ["shield",
     ["vigor", "A"],
@@ -62,7 +64,7 @@ var special_weapons = ["bardiche", "blade",
 If a weapon type isn't listed here, it will not
 be used. */
 var for_melee_single_target = [
-  "sword", "hammer",
+  "big sword", "hammer",
 ]
 
 /* How many regular enemies are needed to start
@@ -758,6 +760,7 @@ func equip_L(it)
   _equip_L=it
   ?is_2hander(it)|is_2hander(found_type)
     return aac(it)
+  ")
   equipL @it@
   return it
 var _equip_R=false
@@ -765,6 +768,7 @@ func equip_R(it)
   _equip_R=it
   ?is_2hander(it)|is_2hander(found_type)
     return aac(it)
+  ")
   equipR @it@
   return it
 func is_2hander(ty)
