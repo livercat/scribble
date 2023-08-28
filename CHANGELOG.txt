@@ -1,3 +1,19 @@
+Version 1.3.1
+  - Fix the hammer sometimes whiffing during AoE
+  - Start the zone with full armor
+  - Use only main hand for stunlocking, debuff/dps with the other
+  - Don't use wands or staffs against beetles
+  - Don't use vigor weapons against Cultist
+  - Use a zerk potion for Dysan phase1
+  - Use better weapons for Dysan phase3
+  - Improve root evasion on the yellow Xylo
+  - Better stunlock for Ceiling Decorator
+  - Use a zerk potion earlier on Hrimnir
+  - Significantly improve the yellow Nagaraja
+  - Fix dodging Nagaraja poison while using wands (by disabling wands at specific moments)
+  - Add frame timing info in debug mode
+  - Simplify some code
+
 Version 1.3
   - Another major rework, basically a rewrite
   - Automatic AAC for 2-handed weapons
