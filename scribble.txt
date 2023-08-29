@@ -16,9 +16,10 @@ var elemental_items = [
   ["hammer",
     ["aether", "D+10", "D+8"],
     ["poison", "D+8", "D+7"],
+    ["ice", "D+7"],
     ["default",
      "aether hammer D+10", "poison hammer D+8",
-     "stone hammer +7"],
+     "ice hammer D+7"],
   ],
   ["wand",
     ["vigor", "D+8", "D+7"],
@@ -94,6 +95,11 @@ or when `prefer_ranged` is true. */
 var for_ranged_single_target = ["repeating",
 "crossbow", "wand"]
 
+/* Enable this _only_ if you have 10* repeating
+crossbow without attack speed enchant.
+Increases effective attack speed. */
+var enable_repeating_aac = false
+
 /* Weapons to use for ranged AoE. Ranged AoE is
 triggered by the same threshold as melee AoE.*/
 var for_ranged_aoe = ["wand", "staff"]
@@ -116,7 +122,7 @@ var do_stunlock = [
 
 // Full names of weapons to use for stunlocking
 var stunlock_weapons = [
-  "stone hammer +7", "poison hammer D",
+  "ice hammer D+7", "poison hammer D",
   "aether hammer D", ]
 
 /* How much HP a non-boss enemy must have
@@ -1125,6 +1131,7 @@ func use_abilities()
   ?should_slap()
     return slap()
   return false
+var aac_tick=1
 func aac(weapon)
   _equip_L=weapon
   equip @weapon@
@@ -1133,9 +1140,17 @@ func aac(weapon)
   ?is(lock,"hammer")|
   ^is(lock,"bardiche")
     return false
-  for it:ranged_2h_types
-    ?weapon=it
-      return false
+  ?weapon="repeating"
+    ?!enable_repeating_aac
+      return weapon
+    aac_tick--
+    ?aac_tick=0
+      aac_tick=2
+      equip blade
+      equip @weapon@
+    return weapon
+  ?weapon="wand"|weapon="staff"
+    return false
   equip wand
   equip @weapon@
   return weapon
