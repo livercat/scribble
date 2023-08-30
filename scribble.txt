@@ -15,37 +15,39 @@ want the script to use them. */
 var elemental_items = [
   ["hammer",
     ["aether", "D+10", "D+8"],
-    ["poison", "D+8", "D+7"],
-    ["ice", "D+7"],
+    ["poison", "D+8", "D+7"], // dP, *9
+    ["ice", "D+7"], // D, dI
+    // ["fire", "dF"],
+    // ["vigor", "dL"],
     ["default",
      "aether hammer D+10", "poison hammer D+8",
      "ice hammer D+7"],
   ],
   ["wand",
-    ["vigor", "D+8", "D+7"],
+    ["vigor", "D+7", "dL+9", "dL+8"], // *9
     ["poison", "dP"],
     ["fire", "dF"],
     ["ice", "dI"],
     ["default",
-    "vigor wand D+8", "vigor wand D+7",
+    "vigor wand dL",
     "poison wand dP"],
   ],
   ["sword",
-    ["aether", "dU+9","dU+8"],
-    ["fire", "D+11", "D+8", "dF"],
-    ["ice", "D+9", "D+7", "dI"],
-    ["poison", "D", "dP"],
-    ["vigor", "D", "dL+10", "dL+9"],
+    ["aether", "D+7", "dU+9","dU+8"], // D
+    ["fire", "D+11", "D+8", "dF"], // *9
+    ["ice", "D+9", "D+7", "dI"], // *9
+    ["poison", "D+9", "D+7", "dP"], // *9
+    ["vigor", "D+9", "D+7", "dL+10", "dL+9"], // *9
     ["default",
      "fire sword D+11", "vigor sword dL+10",
      "aether sword dU+9", "poison sword D+7"],
   ],
   ["shield",
-    ["vigor", "A"],
+    ["vigor", "A"], // *9
     ["poison", "A"],
-    ["ice", "A"],
+    ["ice", "A"], // *9
     ["aether", "A"],
-    ["fire", "A"],
+    ["fire", "A"], // *9
     ["default", "compound"],
   ],
 ]
@@ -98,7 +100,7 @@ var for_ranged_single_target = ["repeating",
 /* Enable this _only_ if you have 10* repeating
 crossbow without attack speed enchant.
 Increases effective attack speed. */
-var enable_repeating_aac = false
+var enable_repeating_aac = true
 
 /* Weapons to use for ranged AoE. Ranged AoE is
 triggered by the same threshold as melee AoE.*/
@@ -190,7 +192,7 @@ to use Smite ability. */
 var smite_treshold = 7
 
 // Depends on level/enchants of your BFG.
-var smite_damage = 85
+var smite_damage = 90
 
 // Enable smiting two screens at once
 var long_long_smite = true
@@ -216,10 +218,6 @@ var max_pickpocket_stacks = 3
 will approach the scout, use mask, get hit as
 long as the debuff lasts, and quit the zone. */
 var mask_quest = false
-
-/* Wear the cultist mask out of combat. For some
-reason ;) */
-var idle_mask = false
 
 // Show ability cooldowns in UI
 var ui_show_cd = true
@@ -307,20 +305,14 @@ func healwalk()
     return equip_L("trisk")&summon()
   :?can_qs_dash()
     return qs_dash()
-  ?idle_mask
-    equip_R("mask")
-  :
-    auto_equip_shield()
+  auto_equip_shield()
   ?hp<maxhp
     return equip_L("ouroboros")
   return equip_L("trisk")
 func avoid_explosion()
   ?fd<5
     return try_evade()
-  equip_L("sword")
-  ?idle_mask
-    return equip_R("mask")
-  return equip_R("dashing")
+  return equip_L("sword")&equip_R("dashing")
 var scrolling=0
 func smite_two_screens()
   var cd_ok=get_cd("blade")<=0
@@ -595,21 +587,16 @@ func is_poison_near()
   return draw.GetSymbol(x+2,y-6)="("|
   ^(draw.GetSymbol(x+1,y-6)="(")
 func regular_fight()
-  ?phys_immune|(foe=magic_vulnerability&
-  ^can_aoe)
-    return auto_ranged()
   ?must_ranged_foe()
     return ranged("single")
-  ?foe=immune_to_ranged
+  ?foe=immune_to_ranged|foe=ranged
     return auto_melee()
   ?prefer_ranged_foe()&can_aoe&
   ^fd>melee_aoe_range
     return auto_ranged()
   ?prefer_ranged
-    ?can_backflip()
-      return backflip()
-    :
-      return auto_ranged()
+    return (can_backflip()&backflip())|
+    ^auto_ranged()
   return auto_melee()
 func must_ranged_foe()
   for enemy:must_ranged_foes
@@ -619,11 +606,6 @@ func prefer_ranged_foe()
   for enemy:prefer_ranged_foes
     ?foe=enemy
       return true
-func must_melee_foe()
-  return foe=immune_to_ranged|foe=ranged
-func should_unmake()
-  return unmaking_threshold>0&!is_boss&
-  ^foe.maxhp>=unmaking_threshold
 func auto_melee()
   ?use_abilities()
     return true
@@ -817,37 +799,29 @@ func find_dps_weapon(range,aoe,allow_2h)
     ^weak_elem,"stats",allow_2h)
   return found
 func try_equip_debuff(range,aoe)
-  var amount=debuff_elems.Count()
-  ?amount=0
-    return false
   found=false
-  var found_idx=-1
-  for i=0 .. amount-1
-    ?!found
-      found=find_debuff_weapon(range,aoe,
-      ^debuff_elems[i],true)
-    ?found&found_idx=-1
-      found_idx=i
-  ?!found
-    return false
-  equip_L(found)
-  ?is_2hander(found_type)
-    return true
-  found=false
-  ?found_idx+1<amount
-    for i=found_idx+1 .. amount-1
-      ?!found
-        found=find_debuff_weapon(range,aoe,
-        ^debuff_elems[i],false)
+  var arr=[]
+  for i=0 .. debuff_elems.Count()-1
+    found=find_debuff_weapon(range,aoe,
+    ^debuff_elems[i],true)
     ?found
-      return equip_R(found)
-  ?!found
+      arr.Add([found,found_type])
+  ?arr.Count()=0
+    return false
+  equip_L(arr[0][0])
+  ?is_2hander(arr[0][1])
+    return true
+  ?low_hp
     return auto_equip_R(range,aoe)
+  :?arr.Count()>1
+    return equip_R(arr[1][0])
+  return auto_equip_R(range,aoe)
 func find_debuff_weapon(range,aoe,
 ^elem,allow_2h)
   found=find_weapon(range,aoe,
   ^elem,"mod",allow_2h)
-  ?!found&range="melee"&!must_melee_foe()
+  ?!found&range="melee"&
+  ^!(foe=immune_to_ranged|foe=ranged)
     found=find_weapon("ranged",aoe,elem,
     ^"mod",allow_2h)
   return found
@@ -860,6 +834,8 @@ func try_equip_unmake(range,aoe)
   equip_L(found)
   ?is_2hander(found_type)
     return true
+  ?low_hp
+    return auto_equip_R(range,aoe)
   found=find_unmake_weapon(range,aoe,false)
   ?found
     return equip_R(found)
@@ -924,6 +900,9 @@ func get_item(ty,elem,purpose)
     ^(!excluded_items|!(it=excluded_items))
       return it
   return false
+func should_unmake()
+  return unmaking_threshold>0&!is_boss&
+  ^foe.maxhp>=unmaking_threshold
 func debuffing_allowed()
   ?disable_debuffs
     return false
@@ -1020,11 +999,11 @@ func should_slap()
   return can_slap()&(!pickpocket_quest|
   ^foe_ehp<=arm_damage)
 func slap()
-  aac("arm")
-  ?get(my_effects,"pick_pocket")>=
+  ?get(my_effects,"pick_pocket")<
   ^max_pickpocket_stacks
-    use("skeleton_arm")
-  return true
+    return aac("arm")
+  equip_L("arm")
+  return use("skeleton_arm")
 func can_smite()
   return can_use("blade")&
   ^fd<=20&(foe!pallas)&
@@ -1193,9 +1172,11 @@ func _categorize_item(ty,suffixes)
     ?is(elem,"default")
       add_item(hash([ty,"default"]),suffix)
     :
+      var purpose=get_purpose(suffix)
+      suffix=string.Join("",
+      ^string.Split(suffix))
       var full_name=string.Join(" ",
       ^[elem,ty,suffix])
-      var purpose=get_purpose(suffix)
       var h=hash([ty,elem,purpose])
       add_item(h,full_name)
 func hash(parts)
