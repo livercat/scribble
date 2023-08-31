@@ -413,7 +413,7 @@ func fight_hrimnir()
       ranged("single")
   :?is_boss&fc=1
     ?foe.armor>0
-      ?foe.armor<200&can_hammer()
+      ?can_hammer()
         return hammer()
       return melee("dps")
     maybe_drink()
