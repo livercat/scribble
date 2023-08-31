@@ -76,6 +76,9 @@ var hammer_frames=15
 var bardiche_frames=30
 var bardiche_dmg=52 * (7.6+2)
 var use_potions_for_bosses=true
+var fast_potion_bosses=[
+  "xylo","mushrooms","pallas",
+]
 var low_hp_threshold=1
 var use_shield_on_low_hp=true
 var max_chill_stacks=6
@@ -150,6 +153,7 @@ func progress()
         ^do_stunlock.Contains("ice elemental")
           disable_r("mask")
           disable_r("blade")
+          disable_r("hammer")
           return stunlock()
         :
         return auto_melee_miniboss()
@@ -306,6 +310,8 @@ func fight_xyloalgia()
   var stunlock_poena=loc.stars>5&
   ^can_stunlock&do_stunlock.Contains("poena")
   ?foe=phase1
+    ?fast_potion_bosses.Contains("xylo")
+      maybe_drink()
     ?stunlock_poena
       disable_r("mask")
       disable_r("hammer")
@@ -345,29 +351,35 @@ func fight_bolesh()
 func fight_mushrooms()
   var delay=chill_delay()
   ?foe=phase1
-    maybe_drink()
+    ?fast_potion_bosses.Contains("mushrooms")
+      maybe_drink()
     disable_r("skeleton_arm")
     ?fs=32&evade_at(46+delay)
       return
     :?fs=33&ft=fd+4
       return soft_block()
   :?foe=mushroom_boss_fat
+    maybe_drink()
     ?fs=32&evade_at(26+delay)
       return
   auto_melee_boss()
 func fight_pallas()
   disable_r("skeleton_arm")
   ?foe=phase1
-    maybe_drink()
+    ?fast_potion_bosses.Contains("pallas")
+      maybe_drink()
     ?fs=32&ft=68
       soft_block()
     :
       auto_melee_boss()
   :?foe=phase2
+    maybe_drink()
     ?fc>2
       return ranged("aoe")
     auto_melee_boss()
 func fight_bronze_guardian()
+  ?fast_potion_bosses.Contains("bronze")
+    maybe_drink()
   ?fs=32&ft=33&
   ^armor<foe.damage
     backflip()
@@ -401,6 +413,8 @@ func fight_hrimnir()
       ranged("single")
   :?is_boss&fc=1
     ?foe.armor>0
+      ?foe.armor<200&can_hammer()
+        return hammer()
       return melee("dps")
     maybe_drink()
     auto_melee_boss()
@@ -420,6 +434,8 @@ func is_snowball_near()
   return false
 var naga_step=0
 func fight_nagaraja()
+  ?fast_potion_bosses.Contains("naga")
+    maybe_drink()
   var to_dodge=1
   ?loc.stars>10
     to_dodge=4
@@ -504,19 +520,19 @@ func melee(mode)
     ?try_equip_unmake("melee",aoe)
       trace("unmaking")
       mode="unmake"
+      return approach()
   :?should_debuff()
     ?try_equip_debuff("melee",aoe)
       trace("debuff")
       mode="debuff"
-  ?is(mode,"dps")
-    auto_equip_dps("melee",false)
-  :?is(mode,"aoe")
-    auto_equip_dps("melee",true)
-  :?is(mode,"def")
+      return approach()
+  ?is(mode,"def")
     auto_equip_L("melee",false)
     ?use_shield_on_low_hp
       auto_equip_shield()
     auto_equip_R("melee",false)
+  :
+    auto_equip_dps("melee",aoe)
   return approach()
 func approach()
   var range=6
@@ -524,9 +540,6 @@ func approach()
     range=get(weapon_ranges,found_type)+1
   ?fd>range
     trace("approach")
-    ?is_2hander(found_type)
-      _equip_L=false
-      auto_equip_L("melee",false)
     ?!is_2hander(found_type)
       auto_equip_shield()
   return true
@@ -570,10 +583,10 @@ func auto_melee_boss()
   ^try_equip_unmake("melee",false)
     trace("unmaking")
     return approach()
-  :?should_debuff()&
-  ^try_equip_debuff("melee",false)
-    trace("debuff")
-    return approach()
+  :?should_debuff()
+    ?try_equip_debuff("melee",false)
+      trace("debuff")
+      return approach()
   auto_equip_dps("melee",false)
   return approach()
 func auto_melee_miniboss()
@@ -617,7 +630,7 @@ func stunlock()
   found=false
   for it:stunlock_weapons
     ?!found&!(it=excluded_items)&
-    ^(weak="default"|!(it=weak))
+    ^!(it=foe_elem)
       found=it
   ?found
     equip_L(found)
@@ -701,23 +714,25 @@ func find_dps_weapon(range,aoe,allow_2h)
 func try_equip_debuff(range,aoe)
   trace("try_eq_debuff")
   found=false
-  var arr=[]
-  for i=0 .. debuff_elems.Count()-1
+  for elem:debuff_elems
     found=find_debuff_weapon(range,aoe,
-    ^debuff_elems[i],true)
+    ^elem,!_equip_L)
     ?found
-      arr.Add([found,found_type])
-  ?arr.Count()=0
+      ?!_equip_L
+        equip_L(found)
+        ?is_2hander(found_type)
+          return true
+      :?!_equip_R
+        ?low_hp
+          return auto_equip_R(range,aoe)
+        return equip_R(found)
+  ?_equip_L
+    ?!_equip_R
+      return auto_equip_R(range,aoe)
+  :
     trace("no_debuff_weapon")
     return false
-  equip_L(arr[0][0])
-  ?is_2hander(arr[0][1])
-    return true
-  ?low_hp
-    return auto_equip_R(range,aoe)
-  :?arr.Count()>1
-    return equip_R(arr[1][0])
-  return auto_equip_R(range,aoe)
+  return true
 func find_debuff_weapon(range,aoe,
 ^elem,allow_2h)
   trace("find_debuff_wep")
@@ -765,8 +780,8 @@ func find_weapon(range,aoe,elem,
         found_type=ty
         return ty
       found=get_item(ty,elem,purpose)
-      ?!found
-        ?purpose="stats"&use_mods_for_dmg
+      ?!found&purpose="stats"
+        ?use_mods_for_dmg
           found=get_item(ty,elem,"mod")
         ?!found
           found=get_item(ty,"default","")
@@ -821,11 +836,10 @@ func can_debuff()
     return false
   return true
 var disable_debuffs=false
-func should_debuff()
-  return can_debuff()&
-  ^check_foe_effects()
 var debuff_elems=[]
-func check_foe_effects()
+func should_debuff()
+  ?!can_debuff()
+    return false
   debuff_elems.Clear()
   ?can_be_debuffed("debuff_damage")
     debuff_elems.Add("poison")
@@ -1036,10 +1050,10 @@ func aac(weapon)
   _equip_L=weapon
   equip @weapon@
   ?!ai.idle
-    return false
+    return true
   ?is(lock,"hammer")|
   ^is(lock,"bardiche")
-    return false
+    return true
   ?weapon="repeating"
     ?!enable_repeating_aac
       return weapon
@@ -1050,7 +1064,7 @@ func aac(weapon)
       equip @weapon@
     return weapon
   ?weapon="wand"|weapon="staff"
-    return false
+    return true
   equip wand
   equip @weapon@
   return weapon
@@ -1223,17 +1237,24 @@ func get_foe_effect(str,uid)
   ?is(uid,"stun")
     return int.Parse(splt[i+2])
   return int.Parse(splt[i+1])
+var foe_elem="default"
 func get_foe_weak_elem()
   ?foe=aether
+    foe_elem="aether"
     return "vigor"
   ?foe=fire
+    foe_elem="fire"
     return "aether"
   ?foe=ice
+    foe_elem="ice"
     return "fire"
   ?foe=poison
+    foe_elem="poison"
     return "ice"
   ?foe=vigor
+    foe_elem="vigor"
     return "poison"
+  foe_elem="default"
   return "default"
 var all_abilities=[
   "mind","hammer","bardiche","blade",
