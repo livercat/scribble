@@ -15,6 +15,9 @@ var elemental_items=[
     ["default",
     "vigor wand dL","poison wand dP"],
   ],
+  ["staff",
+    ["aether","dU"]
+  ],
   ["crossbow",
     ["poison","dP"],
     ["fire","dF"],
@@ -762,10 +765,10 @@ func try_equip_unmake(range,aoe)
   return auto_equip_R()
 func find_unmake_weapon(range,aoe,allow_2h)
   trace("find_unmake_wep")
-  found=find_weapon(range,false,
+  found=find_weapon(range,aoe,
   ^"aether","mod",allow_2h)
   ?!found&range="melee"
-    found=find_weapon("ranged",false,
+    found=find_weapon("ranged",aoe,
     ^"aether","mod",allow_2h)
   return found
 func find_weapon(range,aoe,elem,
@@ -840,6 +843,8 @@ var debuff_elems=[]
 func should_debuff()
   ?!can_debuff()
     return false
+  ?loc=Rocky
+    return true
   debuff_elems.Clear()
   ?can_be_debuffed("debuff_damage")
     debuff_elems.Add("poison")

@@ -3,10 +3,11 @@ Version 1.3.1
   - New setting: `use_mods_for_dmg` - if true, then script can use dX weapons for dps purposes if you don't have a D weapon of that element. Default is false.
   - New setting: `fast_potion_bosses` - a list of bosses where the script will use crit/speed potion right at the start of phase1.
   - Fix the hammer sometimes whiffing during AoE
+  - Use AoE unmaking weapons if needed
   - Start the zone with full armor
   - Use only main hand for stunlocking, debuff/dps with the other
   - Don't use wands or staffs against beetles
-  - Don't use vigor weapons against Cultist
+  - Don't use vigor weapons against Poison Cultist
   - Use a zerk potion for Dysan phase1
   - Use better weapons for Dysan phase3
   - Improve root evasion on the yellow Xylo

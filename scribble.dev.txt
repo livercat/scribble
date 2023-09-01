@@ -15,7 +15,7 @@ want the script to use them. */
 var elemental_items = [
   ["hammer",
     ["aether", "D+10", "D+8"],
-    ["poison", "D+8", "D+7"], // dP, *9
+    ["poison", "D+8", "D+7"], // dP
     ["ice", "D+7"], // D, dI
     // ["fire", "dF"],
     // ["vigor", "dL"],
@@ -24,25 +24,28 @@ var elemental_items = [
      "ice hammer D+7"],
   ],
   ["wand",
-    ["vigor", "D+7", "dL+9", "dL+8"], // *9
+    ["vigor", "D+7", "dL+9", "dL+8"], // *9dL
     ["poison", "dP"],
-    ["fire", "dF"], // D
-    ["ice", "dI"],
+    ["fire", "dF"], // D, *6dF
+    ["ice", "dI"], // *9
     ["default", 
     "vigor wand dL", "poison wand dP"],
   ],
+  ["staff", 
+    ["aether", "dU"] // *9
+  ],
   ["crossbow",
-    ["poison", "dP"],
+    ["poison", "dP"], // *9
     // ["aether", "D"],
     ["fire", "dF"],
-    ["ice", "dI"], // "D", 
+    ["ice", "dI"], // D, *9 
   ],
   ["sword",
-    ["aether", "D+10", "D+7", "dU+9","dU+8"], // *9
+    ["aether", "D+10", "D+7", "dU+9","dU+8"], // *9D
     ["fire", "D+11", "D+8", "dF"],
     ["ice", "D+9", "D+7", "dI"], // *9
-    ["poison", "D+9", "D+7", "dP"], // *9
-    ["vigor", "D+9", "D+7", "dL+10", "dL+9"], // *9
+    ["poison", "D+9", "D+7", "dP"], // *9D
+    ["vigor", "D+9", "D+7", "dL+10", "dL+9"], // *9dL
     ["default", 
      "fire sword D+11", "aether sword D+10",
      "ice sword D+9", "poison sword D+7"],
@@ -50,9 +53,9 @@ var elemental_items = [
   ["shield",
     ["vigor", "A"], // *9
     ["poison", "A"],
-    ["ice", "A"], // *9
+    ["ice", "A"],
     ["aether", "A"],
-    ["fire", "A"], // *9
+    ["fire", "A"],
     ["default", "compound"],
   ],
 ]
@@ -1056,10 +1059,10 @@ func try_equip_unmake(range, aoe)
 
 func find_unmake_weapon(range, aoe, allow_2h)
   trace("find_unmake_wep")
-  found = find_weapon(range, false, 
+  found = find_weapon(range, aoe, 
   ^"aether", "mod", allow_2h)
   ?!found & range = "melee"
-    found = find_weapon("ranged", false, 
+    found = find_weapon("ranged", aoe, 
     ^"aether", "mod", allow_2h)
   return found
 
@@ -1141,6 +1144,8 @@ var debuff_elems = []
 func should_debuff()
   ?!can_debuff()
     return false
+  ?loc = Rocky
+    return true // always debuff Dysan?
   debuff_elems.Clear()
   ?can_be_debuffed("debuff_damage")
     debuff_elems.Add("poison")
