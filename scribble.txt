@@ -24,7 +24,7 @@ var elemental_items = [
      "ice hammer D+7"],
   ],
   ["wand",
-    ["vigor", "D+7", "dL+9", "dL+8"], // *9dL
+    ["vigor", "D+8", "D+7", "dL+9"], // *9dL
     ["poison", "dP"],
     ["fire", "dF"], // D, *6dF
     ["ice", "dI"], // *9
@@ -904,7 +904,8 @@ func find_weapon(range,aoe,elem,
         return found
   return false
 func get_preferred_types(range,aoe)
-  ?phys_immune|foe=magic_vulnerability
+  ?phys_immune|
+  ^(can_aoe&foe=magic_vulnerability)
     return for_phys_immune
   var types=for_melee_single_target
   ?is(range,"melee")
