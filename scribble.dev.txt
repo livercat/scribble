@@ -1123,6 +1123,8 @@ func should_unmake()
 func can_debuff()
   ?disable_debuffs
     return false
+  ?loc = Rocky
+    return true // always debuff Dysan?
   ?is_boss & (is(debuff_bosses, "never") |
   ^is(debuff_bosses, "smite") & smite_stacks=0)
     return false
@@ -1137,8 +1139,6 @@ var debuff_elems = []
 func should_debuff()
   ?!can_debuff()
     return false
-  ?loc = Rocky
-    return true // always debuff Dysan?
   debuff_elems.Clear()
   ?can_be_debuffed("debuff_damage")
     debuff_elems.Add("poison")
