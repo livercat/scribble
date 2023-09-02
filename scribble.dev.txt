@@ -1081,7 +1081,8 @@ func find_weapon(range, aoe, elem,
   return false
 
 func get_preferred_types(range, aoe)
-  ?phys_immune | foe = magic_vulnerability
+  ?phys_immune | 
+  ^(can_aoe & foe = magic_vulnerability)
     return for_phys_immune
   var types = for_melee_single_target
   ?is(range, "melee")
