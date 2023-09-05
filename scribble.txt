@@ -14,20 +14,20 @@ whole elements and weapon types if you don't
 want the script to use them. */
 var elemental_items = [
   ["hammer",
+    ["poison", "D+8", "D+7"], // dP*9
     ["aether", "D+10", "D+8"],
-    ["poison", "D+8", "D+7"], // dP
-    ["ice", "D+7"], // D, dI
-    // ["fire", "dF"],
+    ["fire", "dF"],
+    ["ice", "D+7", "dI"], // D
     // ["vigor", "dL"],
     ["default",
      "aether hammer D+10", "poison hammer D+8",
      "ice hammer D+7"],
   ],
   ["wand",
-    ["vigor", "D+8", "D+7", "dL+9"], // *9dL
     ["poison", "dP"],
+    ["vigor", "D+8", "D+7", "dL+9"],
     ["fire", "dF"], // D, *6dF
-    ["ice", "dI"], // *9
+    ["ice", "dI"],
     ["default",
     "vigor wand dL", "poison wand dP"],
   ],
@@ -35,23 +35,23 @@ var elemental_items = [
     ["aether", "dU"] // *9
   ],
   ["crossbow",
-    ["poison", "dP"], // *9
+    ["poison", "dP"],
     // ["aether", "D"],
     ["fire", "dF"],
-    ["ice", "dI"], // D, *9
+    ["ice", "dI"], // D
   ],
   ["sword",
-    ["aether", "D+10", "D+7", "dU+9","dU+8"], // *9D
+    ["poison", "D+10", "D+9", "dP"],
+    ["vigor", "D+11", "D+10", "dL+10", "dL+9"],
+    ["aether", "D+10", "D+9", "dU+9","dU+8"],
     ["fire", "D+11", "D+8", "dF"],
-    ["ice", "D+9", "D+7", "dI"], // *9
-    ["poison", "D+9", "D+7", "dP"], // *9D
-    ["vigor", "D+9", "D+7", "dL+10", "dL+9"], // *9dL
+    ["ice", "D+9", "D+7", "dI"],
     ["default",
      "fire sword D+11", "aether sword D+10",
      "ice sword D+9", "poison sword D+7"],
   ],
   ["shield",
-    ["vigor", "A"], // *9
+    ["vigor", "A"],
     ["poison", "A"],
     ["ice", "A"],
     ["aether", "A"],
@@ -86,9 +86,7 @@ var aoe_treshold = 4
 
 /* Weapons to use for melee AoE, same priority
 logic as the regular melee. */
-var for_melee_aoe = [
-"arm", "bardiche", "big sword",
-]
+var for_melee_aoe = ["arm"]
 
 /* If this is set to `true`, script will prefer
 to use ranged items from lists below instead of
@@ -137,8 +135,8 @@ var do_stunlock = [
 
 // Full names of weapons to use for stunlocking
 var stunlock_weapons = [
-  "ice hammer D+7", "poison hammer D",
-  "aether hammer D", ]
+  "ice hammer D+7", "fire hammer dF",
+  "poison hammer D", "aether hammer D"]
 
 /* How much HP a non-boss enemy must have
 to use dU weapons on it instead of other
@@ -186,7 +184,7 @@ default logic that prefers to drink during the
 mushrooms, pallas, bronze, naga. The rest
 already drink the potion in phase1. */
 var fast_potion_bosses = [
-  "xylo", "mushrooms", "pallas",
+  "mushrooms", "pallas",
 ]
 
 /* Fraction of HP to consider low. When on low
@@ -199,7 +197,7 @@ var low_hp_threshold = 1
 
 /* Switch to 1h+shield against non-boss foes
 when `low_hp_threshold` is reached */
-var use_shield_on_low_hp = true
+var use_shield_on_low_hp = false
 
 // Choose amount based on your `dI` weapon
 var max_chill_stacks = 6
@@ -336,7 +334,8 @@ func healwalk()
 func avoid_explosion()
   ?fd<5
     return try_evade()
-  return equip_L("sword")&equip_R("dashing")
+  return auto_equip_L("melee",false)&
+  ^equip_R("dashing")
 var scrolling=0
 func smite_two_screens()
   var cd_ok=get_cd("blade")<=0
@@ -940,14 +939,21 @@ func get_item(ty,elem,purpose)
 func should_unmake()
   return unmaking_threshold>0&!is_boss&
   ^foe.maxhp>=unmaking_threshold
+var only_dot=false
 func can_debuff()
+  only_dot=false
   ?disable_debuffs
     return false
-  ?loc=Rocky
-    return true
-  ?is_boss&(is(debuff_bosses,"never")|
-  ^is(debuff_bosses,"smite")&smite_stacks=0)
-    return false
+  ?is_boss
+    ?is(debuff_bosses,"never")
+      return false
+    ?is(debuff_bosses,"smite")&smite_stacks=0
+      ?loc=Rocky
+        return true
+      ?can_be_debuffed("debuff_dot")
+        only_dot=true
+        return true
+      return false
   ?!is_boss&(is(debuff_non_bosses,"never")|
   ^is(debuff_non_bosses,"smite")&smite_stacks=0)
     return false
@@ -958,12 +964,14 @@ func should_debuff()
   ?!can_debuff()
     return false
   debuff_elems.Clear()
-  ?can_be_debuffed("debuff_damage")
-    debuff_elems.Add("poison")
   ?can_be_debuffed("debuff_dot")
     debuff_elems.Add("fire")
+    ?only_dot
+      return true
   ?can_be_debuffed("debuff_chill")
     debuff_elems.Add("ice")
+  ?can_be_debuffed("debuff_damage")
+    debuff_elems.Add("poison")
   var c=debuff_elems.Count()
   ?c>1&
   ^foe=debuff_elems[0]

@@ -1,15 +1,16 @@
 var elemental_items=[
   ["hammer",
-    ["aether","D+10","D+8"],
     ["poison","D+8","D+7"],
-    ["ice","D+7"],
+    ["aether","D+10","D+8"],
+    ["fire","dF"],
+    ["ice","D+7","dI"],
     ["default",
      "aether hammer D+10","poison hammer D+8",
      "ice hammer D+7"],
   ],
   ["wand",
-    ["vigor","D+8","D+7","dL+9"],
     ["poison","dP"],
+    ["vigor","D+8","D+7","dL+9"],
     ["fire","dF"],
     ["ice","dI"],
     ["default",
@@ -24,11 +25,11 @@ var elemental_items=[
     ["ice","dI"],
   ],
   ["sword",
-    ["aether","D+10","D+7","dU+9","dU+8"],
+    ["poison","D+10","D+9","dP"],
+    ["vigor","D+11","D+10","dL+10","dL+9"],
+    ["aether","D+10","D+9","dU+9","dU+8"],
     ["fire","D+11","D+8","dF"],
     ["ice","D+9","D+7","dI"],
-    ["poison","D+9","D+7","dP"],
-    ["vigor","D+9","D+7","dL+10","dL+9"],
     ["default",
      "fire sword D+11","aether sword D+10",
      "ice sword D+9","poison sword D+7"],
@@ -49,9 +50,7 @@ var for_melee_single_target=[
 ]
 var use_mods_for_dmg=false
 var aoe_treshold=4
-var for_melee_aoe=[
-"arm","bardiche","big sword",
-]
+var for_melee_aoe=["arm"]
 var prefer_ranged=false
 var prefer_ranged_foes=[]
 var must_ranged_foes=["wasp","wasp nest",
@@ -66,8 +65,8 @@ var do_stunlock=[
   "poena","ceiling decorator","ice elemental"
 ]
 var stunlock_weapons=[
-  "ice hammer D+7","poison hammer D",
-  "aether hammer D",]
+  "ice hammer D+7","fire hammer dF",
+  "poison hammer D","aether hammer D"]
 var unmaking_threshold=600
 var debuff_bosses="smite"
 var debuff_non_bosses="smite"
@@ -80,10 +79,10 @@ var bardiche_frames=30
 var bardiche_dmg=52 * (7.6+2)
 var use_potions_for_bosses=true
 var fast_potion_bosses=[
-  "xylo","mushrooms","pallas",
+  "mushrooms","pallas",
 ]
 var low_hp_threshold=1
-var use_shield_on_low_hp=true
+var use_shield_on_low_hp=false
 var max_chill_stacks=6
 var max_ignition_stacks=10
 var cinderwisp_dmg=24
@@ -98,7 +97,7 @@ var mask_quest=false
 var ui_show_cd=true
 var ui_show_statuses=true
 var ui_show_debug=true
-var enable_tracing=true
+var enable_tracing=false
 var enable_hit_tracking=false
 func progress()
   ?pickup.distance<9
@@ -193,7 +192,8 @@ func avoid_explosion()
   trace("explode")
   ?fd<5
     return try_evade()
-  return equip_L("sword")&equip_R("dashing")
+  return auto_equip_L("melee",false)&
+  ^equip_R("dashing")
 var scrolling=0
 func smite_two_screens()
   var cd_ok=get_cd("blade")<=0
@@ -829,14 +829,21 @@ func get_item(ty,elem,purpose)
 func should_unmake()
   return unmaking_threshold>0&!is_boss&
   ^foe.maxhp>=unmaking_threshold
+var only_dot=false
 func can_debuff()
+  only_dot=false
   ?disable_debuffs
     return false
-  ?loc=Rocky
-    return true
-  ?is_boss&(is(debuff_bosses,"never")|
-  ^is(debuff_bosses,"smite")&smite_stacks=0)
-    return false
+  ?is_boss
+    ?is(debuff_bosses,"never")
+      return false
+    ?is(debuff_bosses,"smite")&smite_stacks=0
+      ?loc=Rocky
+        return true
+      ?can_be_debuffed("debuff_dot")
+        only_dot=true
+        return true
+      return false
   ?!is_boss&(is(debuff_non_bosses,"never")|
   ^is(debuff_non_bosses,"smite")&smite_stacks=0)
     return false
@@ -847,12 +854,14 @@ func should_debuff()
   ?!can_debuff()
     return false
   debuff_elems.Clear()
-  ?can_be_debuffed("debuff_damage")
-    debuff_elems.Add("poison")
   ?can_be_debuffed("debuff_dot")
     debuff_elems.Add("fire")
+    ?only_dot
+      return true
   ?can_be_debuffed("debuff_chill")
     debuff_elems.Add("ice")
+  ?can_be_debuffed("debuff_damage")
+    debuff_elems.Add("poison")
   var c=debuff_elems.Count()
   ?c>1&
   ^foe=debuff_elems[0]
