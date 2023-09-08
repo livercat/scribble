@@ -16,9 +16,6 @@ var elemental_items=[
     ["default",
     "vigor wand dL","poison wand dP"],
   ],
-  ["staff",
-    ["aether","dU"]
-  ],
   ["crossbow",
     ["poison","dP"],
     ["fire","dF"],
@@ -28,11 +25,11 @@ var elemental_items=[
     ["poison","D+10","D+9","dP"],
     ["vigor","D+11","D+10","dL+10","dL+9"],
     ["aether","D+10","D+9","dU+9","dU+8"],
-    ["fire","D+11","D+8","dF"],
+    ["fire","D+11","D+10","dF"],
     ["ice","D+9","D+7","dI"],
     ["default",
-     "fire sword D+11","aether sword D+10",
-     "ice sword D+9","poison sword D+7"],
+     "fire sword D+11","vigor sword D+11",
+     "aether sword D+10","poison sword D+10"],
   ],
   ["shield",
     ["vigor","A"],
@@ -752,6 +749,9 @@ func try_equip_unmake(range,aoe)
     range="ranged"
   found=find_unmake_weapon(range,aoe,true)
   ?!found
+    aoe=false
+    found=find_unmake_weapon(range,aoe,true)
+  ?!found
     trace("no_unmake_weapon")
     return false
   equip_L(found)
@@ -1123,8 +1123,6 @@ func _categorize_item(ty,suffixes)
       add_item(hash([ty,"default"]),suffix)
     :
       var purpose=get_purpose(suffix)
-      suffix=string.Join("",
-      ^string.Split(suffix))
       var full_name=string.Join(" ",
       ^[elem,ty,suffix])
       var h=hash([ty,elem,purpose])
