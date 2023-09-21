@@ -1,3 +1,9 @@
+Version 1.3.2
+  - Reduce dash/bash activation distance to 15 from 16 (to match the game version 3.45.0)
+  - Don't use Smite on bosses, so it's ready for the next loop (that would have helped during the Guardian event, sorry!)
+  - For `fast_potion_bosses` in Naga and Guardian fights, don't take boss distance into account, drink potions right away as was intened (thanks to Fuzznimp!)
+  - Fix typo "treshold" -> "threshold" (thanks to Fuzznimp!)
+
 Version 1.3.1
   - New setting: `enable_repeating_aac` - attack speed increase, only works for 10* repeating crossbow, default is false.
   - New setting: `use_mods_for_dmg` - if true, then script can use dX weapons for dps purposes if you don't have a D weapon of that element. Default is false.

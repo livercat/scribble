@@ -15,21 +15,19 @@ want the script to use them. */
 var elemental_items = [
   ["hammer",
     ["poison", "D+8", "D+7"],
-    ["aether", "D+10", "D+8"],
+    ["aether", "D+11", "D+9"],
     ["fire", "dF"],
-    ["ice", "D+7", "dI"], // D
-    // ["vigor", "dL"],
+    ["ice", "D+7", "dI"],
+    ["vigor", "dL"], // *9
     ["default",
-     "aether hammer D+10", "poison hammer D+8",
-     "ice hammer D+7"],
+     "aether hammer D+11", "aether hammer D+9",
+     "poison hammer D+8", "ice hammer D+7"],
   ],
   ["wand",
     ["poison", "dP"],
     ["vigor", "D+8", "D+7", "dL+9"],
     ["fire", "dF"], // D
     ["ice", "dI"],
-    ["default", 
-    "vigor wand dL", "poison wand dP"],
   ],
   // ["staff", 
   //   ["aether", "dU"]
@@ -82,7 +80,7 @@ var use_mods_for_dmg = false
 
 /* How many regular enemies are needed to start
 using AoE weapons instead of single target. */
-var aoe_treshold = 4
+var aoe_threshold = 4
 
 /* Weapons to use for melee AoE, same priority
 logic as the regular melee. */
@@ -184,7 +182,7 @@ default logic that prefers to drink during the
 mushrooms, pallas, bronze, naga. The rest 
 already drink the potion in phase1. */
 var fast_potion_bosses = [
-  "mushrooms", "pallas",
+  "mushrooms", "pallas", "bronze", "naga"
 ]
 
 /* Fraction of HP to consider low. When on low 
@@ -210,7 +208,7 @@ var cinderwisp_dmg = 24
 
 /* At least this many enemies must be present
 to use Smite ability. */
-var smite_treshold = 7
+var smite_threshold = 7
 
 // Depends on level/enchants of your BFG.
 var smite_damage = 90
@@ -532,8 +530,7 @@ func fight_xyloalgia()
   :?foe = phase2
     ?unsummon()
       return
-    ?disable_debuffs
-      excluded_items = "dU"
+    excluded_items = "dU"
     ?stunlock_poena
       stunlock()
 
@@ -1213,7 +1210,11 @@ func use(ability)
 func maybe_drink()
   ?use_potions_for_bosses & 
   ^(item.potion="berserk"|item.potion="lucky")
-  ^& foe.distance<=melee_range
+  ^& (foe.distance<=melee_range | 
+  ^loc=bronze_guardian &
+  ^fast_potion_bosses.Contains("bronze") |
+  ^loc=nagaraja &
+  ^fast_potion_bosses.Contains("naga"))
     trace("drink")
     activate potion
   return true
@@ -1221,7 +1222,7 @@ func maybe_drink()
 func can_dash()
   return can_activate() & (can_use("dash") | 
   ^can_use("bash") & !disable_debuffs)
-  ^& foe.distance > 10 & foe.distance < 17
+  ^& foe.distance > 10 & foe.distance < 16
 
 func dash()
   trace("dash")
@@ -1288,7 +1289,7 @@ func should_smite()
           return false
       return true
     return false
-  return (is_boss | foe.count >= smite_treshold
+  return (foe.count >= smite_threshold
   ^& foe_ehp <= smite_damage) & can_smite()
 
 func smite()
@@ -1779,7 +1780,7 @@ func _update_game_state()
   foe_ehp = foe.armor + foe.hp
   is_boss = (foe = boss)
   phys_immune = (foe = immune_to_physical)
-  can_aoe = (foe.count >= aoe_treshold)
+  can_aoe = (foe.count >= aoe_threshold)
   // %start_dev%
   traces.Clear()
   // %end_dev%
