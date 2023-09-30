@@ -75,7 +75,7 @@ var use_mods_for_dmg = false
 
 /* How many regular enemies are needed to start
 using AoE weapons instead of single target. */
-var aoe_treshold = 4
+var aoe_threshold = 4
 
 /* Weapons to use for melee AoE, same priority
 logic as the regular melee. */
@@ -1510,7 +1510,8 @@ func _update_game_state()
   phys_immune=(ff=immune_to_physical)
   can_aoe=(fc>=aoe_threshold)
 func prelude()
-  ?speedrun&(tt>loc.averageTime)
+  ?speedrun&(tt>loc.averageTime)&
+  ^loc.averageTime>0
     loc.Leave()
   _update_game_state()
   _update_my_effects()
