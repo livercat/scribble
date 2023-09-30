@@ -243,10 +243,10 @@ var ui_show_debug = false
 
 /* If true, script will exit the location if
 your current time > average time. */
-var speedrun = true
+var speedrun = false
 
 // If true, will use hatchet and shovel
-var harvesting = true
+var harvesting = false
 
 func progress()
   ?pickup.distance<9

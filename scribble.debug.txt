@@ -93,8 +93,8 @@ var ui_show_statuses=true
 var ui_show_debug=true
 var enable_tracing=true
 var enable_hit_tracking=false
-var speedrun=true
-var harvesting=true
+var speedrun=false
+var harvesting=false
 func progress()
   ?pickup.distance<9
     return equip_L("star")&equip_R("trisk")
