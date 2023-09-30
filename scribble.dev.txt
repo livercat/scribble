@@ -25,7 +25,7 @@ var elemental_items = [
     ["default", 
     "vigor wand D+8", "vigor wand D+7"],
   ],
-  ["staff",
+  ["staff", 
     ["aether", "dU"]
   ],
   ["crossbow",
@@ -79,9 +79,7 @@ var aoe_treshold = 4
 
 /* Weapons to use for melee AoE, same priority
 logic as the regular melee. */
-var for_melee_aoe = [
-"arm", "heavy hammer", "bardiche", "big sword",
-]
+var for_melee_aoe = ["arm"]
 
 /* If this is set to `true`, script will prefer
 to use ranged items from lists below instead of
@@ -160,8 +158,8 @@ var useable_abilities = ["dash", "bash",
 /* Advanced: these are default values, change 
 them accordingly if you have speed enchants on 
 these weapons. */
-var hammer_frames = 15
-var bardiche_frames = 30
+var hammer_frames = 14
+var bardiche_frames = 22
 
 /* `dmg * (crit_mult + base_crit_mult)`,
 script won't use the bardiche ability if 
@@ -204,7 +202,7 @@ var cinderwisp_dmg = 24
 
 /* At least this many enemies must be present
 to use Smite ability. */
-var smite_treshold = 7
+var smite_threshold = 7
 
 // Depends on level/enchants of your BFG.
 var smite_damage = 85
@@ -244,6 +242,13 @@ var ui_show_statuses = true
 var ui_show_debug = true
 var enable_tracing = true
 var enable_hit_tracking = false
+
+/* If true, script will exit the location if
+your current time > average time. */
+var speedrun = true
+
+// If true, will use hatchet and shovel
+var harvesting = true
 
 /*********************
 **     #Progress    **
@@ -355,6 +360,9 @@ func healwalk()
     ^item.potion = "vampiric")
       activate potion
     return false // start combat instead
+  :?harvesting & harvest.distance < 3 &
+  ^_harvest()
+    return true
   :?should_summon()
     return equip_L("trisk") & summon()
   :?can_qs_dash()
@@ -364,11 +372,22 @@ func healwalk()
     return equip_L("ouroboros")
   return equip_L("trisk")
 
+func _harvest()
+  ?loc = Rocky
+    return equip_L("shovel")
+  :?loc = Deadwood
+    equip_R("hatchet")
+    ?harvest.distance < 2
+      use("hatchet")
+    return true
+  return false
+
 func avoid_explosion()
   trace("explode")
   ?foe.distance < 5
     return try_evade()
-  return equip_L("sword") & equip_R("dashing")
+  return auto_equip_L("melee", false) & 
+  ^equip_R("dashing")
 
 var scrolling = 0
 func smite_two_screens()
@@ -525,8 +544,7 @@ func fight_xyloalgia()
   :?foe = phase2
     ?unsummon()
       return
-    ?disable_debuffs
-      excluded_items = "dU"
+    excluded_items = "dU"
     ?stunlock_poena
       stunlock()
 
@@ -1037,6 +1055,9 @@ func try_equip_unmake(range, aoe)
     range = "ranged"
   found = find_unmake_weapon(range,aoe,true)
   ?!found
+    aoe = false
+    found = find_unmake_weapon(range,aoe,true)
+  ?!found
     trace("no_unmake_weapon")
     return false
   equip_L(found)
@@ -1120,14 +1141,21 @@ func should_unmake()
   return unmaking_threshold > 0 & !is_boss & 
   ^foe.maxhp >= unmaking_threshold
 
+var only_dot = false
 func can_debuff()
+  only_dot = false
   ?disable_debuffs
     return false
-  ?loc = Rocky
-    return true // always debuff Dysan?
-  ?is_boss & (is(debuff_bosses, "never") |
-  ^is(debuff_bosses, "smite") & smite_stacks=0)
-    return false
+  ?is_boss
+    ?is(debuff_bosses, "never")
+      return false
+    ?is(debuff_bosses,"smite") & smite_stacks=0
+      ?loc = Rocky // always debuff Scout&Dysan
+        return true
+      ?can_be_debuffed("debuff_dot")
+        only_dot = true // keep up the dot
+        return true
+      return false
   ?!is_boss & (is(debuff_non_bosses, "never") |
   ^is(debuff_non_bosses,"smite")&smite_stacks=0)
     return false
@@ -1140,12 +1168,14 @@ func should_debuff()
   ?!can_debuff()
     return false
   debuff_elems.Clear()
-  ?can_be_debuffed("debuff_damage")
-    debuff_elems.Add("poison")
   ?can_be_debuffed("debuff_dot")
     debuff_elems.Add("fire")
+    ?only_dot
+      return true
   ?can_be_debuffed("debuff_chill")
     debuff_elems.Add("ice")
+  ?can_be_debuffed("debuff_damage")
+    debuff_elems.Add("poison")
   var c = debuff_elems.Count()
   ?c > 1 & 
   ^foe = debuff_elems[0]
@@ -1194,7 +1224,11 @@ func use(ability)
 func maybe_drink()
   ?use_potions_for_bosses & 
   ^(item.potion="berserk"|item.potion="lucky")
-  ^& foe.distance<=melee_range
+  ^& (foe.distance<=melee_range | 
+  ^loc=bronze_guardian &
+  ^fast_potion_bosses.Contains("bronze") |
+  ^loc=nagaraja &
+  ^fast_potion_bosses.Contains("naga"))
     trace("drink")
     activate potion
   return true
@@ -1202,7 +1236,7 @@ func maybe_drink()
 func can_dash()
   return can_activate() & (can_use("dash") | 
   ^can_use("bash") & !disable_debuffs)
-  ^& foe.distance > 10 & foe.distance < 17
+  ^& foe.distance > 10 & foe.distance < 16
 
 func dash()
   trace("dash")
@@ -1228,7 +1262,7 @@ func qs_dash()
   trace("qs_dash")
   equip_L("quarterstaff")
   return use("quarterstaff")
-
+    
 func can_backflip()
   return can_use("mind") & free_mind &
    // don't jump into the wall
@@ -1269,7 +1303,7 @@ func should_smite()
           return false
       return true
     return false
-  return (is_boss | foe.count >= smite_treshold
+  return (foe.count >= smite_threshold
   ^& foe_ehp <= smite_damage) & can_smite()
 
 func smite()
@@ -1472,9 +1506,6 @@ func _categorize_item(ty, suffixes)
       add_item(hash([ty, "default"]), suffix)
     :
       var purpose = get_purpose(suffix)
-      // remove extra spaces from the suffix
-      suffix = string.Join("", 
-      ^string.Split(suffix))
       var full_name = string.Join(" ", 
       ^[elem, ty, suffix])
       var h = hash([ty, elem, purpose])
@@ -1763,13 +1794,15 @@ func _update_game_state()
   foe_ehp = foe.armor + foe.hp
   is_boss = (foe = boss)
   phys_immune = (foe = immune_to_physical)
-  can_aoe = (foe.count >= aoe_treshold)
+  can_aoe = (foe.count >= aoe_threshold)
   // %start_dev%
   traces.Clear()
   // %end_dev%
 
 func prelude()
   // reset/update dynamic global vars
+  ?speedrun & (totaltime > loc.averageTime)
+    loc.Leave()
   _update_game_state()
   _update_my_effects()
   _update_abilities()

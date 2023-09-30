@@ -1,5 +1,6 @@
 import re
 import os
+from collections import OrderedDict
 
 dev_re = re.compile(
     "\/\/\s*?\%start_dev\%.+?\/\/\s*?\%end_dev\%", flags=re.MULTILINE | re.DOTALL
@@ -12,6 +13,8 @@ ops_re = re.compile(
     r" *(\||\/|\+|\-|\=|\&|\<|\>|\,|\!|\:(?!$)) *(?!(@|`|\?))", flags=re.MULTILINE
 )
 trace_re = re.compile(r"trace\(.+?\)", flags=re.MULTILINE)
+foe_re = re.compile(r"\bfoe\b(?!\.)")
+loc_re = re.compile(r"\bloc\b(?!\.)")
 
 sep = """
 /*********************
@@ -19,22 +22,43 @@ sep = """
 *********************/"""
 
 
+replacements = OrderedDict((
+    ("foe.armor", "fa"),
+    ("foe.count", "fc"),
+    ("foe.distance", "fd"),
+    ("foe.hp", "fh"),
+    ("foe.id", "fi"),
+    ("foe.maxhp", "fm"),
+    ("foe.state", "fs"),
+    ("foe.time", "ft"),
+    ("totaltime", "tt"),
+))
 def minimize_safe(text):
     text = multiline_comment_re.sub("", text)
     text = comment_re.sub("", text)
     text = ops_re.sub("\g<1>", text)
-    text = (
-        text.replace("foe.state", "fs")
-        .replace("foe.time", "ft")
-        .replace("foe.distance", "fd")
-        .replace("foe.id", "fi")
-        .replace("foe.count", "fc")
+    text = foe_re.sub("ff", text)
+    text = loc_re.sub("ll", text)
+    text = (text
+    .replace("found", "f")
+    .replace("can_activate", "ca")
+    .replace("can_use", "cu")
+    .replace("try_equip", "te")
+    .replace("auto_equip", "ae")
+    .replace("find_", "f_")
+    .replace("is_boss", "ib")
+    .replace("can_be_debuffed", "cbd")
+    .replace("disable_r", "dr")
     )
+    vars_1 = ['var ff=foe', 'var ll=loc']
+    vars_2 = ['  ff=foe', '  ll=loc']
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+        vars_1.append(f'var {dst}=0')
+        vars_2.append(f'  {dst}={src}')
     text = text.replace(
         "func _update_game_state()\n",
-        'var fs=0\nvar ft=0\nvar fd=0\nvar fc=0\nvar fi=""\n'
-        "func _update_game_state()\n  fs=foe.state\n  ft=foe.time\n  "
-        "fd=foe.distance\n  fc=foe.count\n  fi=foe.id\n",
+        '{}\nfunc _update_game_state()\n{}\n'.format('\n'.join(vars_1), '\n'.join(vars_2))
     )
     return text
 
