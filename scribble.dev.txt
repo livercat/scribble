@@ -14,18 +14,18 @@ whole elements and weapon types if you don't
 want the script to use them. */
 var elemental_items = [
   ["hammer",
-    ["poison", "D+8", "D+7"],
+    ["poison", "D+10", "D+9"],
     ["aether", "D+11", "D+9"],
     ["fire", "dF"],
-    ["ice", "D+7", "dI"],
-    ["vigor", "dL"], // *9
+    ["ice", "D+9", "dI"],
+    ["vigor", "dL"],
     ["default",
      "aether hammer D+11", "aether hammer D+9",
      "poison hammer D+8", "ice hammer D+7"],
   ],
   ["wand",
     ["poison", "dP"],
-    ["vigor", "D+8", "D+7", "dL+9"],
+    ["vigor", "D+11", "D+10", "dL"],
     ["fire", "dF"], // D
     ["ice", "dI"],
   ],
@@ -41,9 +41,9 @@ var elemental_items = [
   ["sword",
     ["poison", "D+10", "D+9", "dP"],
     ["vigor", "D+11", "D+10", "dL+10", "dL+9"],
-    ["aether", "D+10", "D+9", "dU+9","dU+8"],
+    ["aether", "D+10", "D+9", "dU+10","dU+9"],
     ["fire", "D+11", "D+10", "dF"],
-    ["ice", "D+9", "D+7", "dI"],
+    ["ice", "D+10", "D+9", "dI"],
     ["default", 
      "fire sword D+11", "vigor sword D+11",
      "aether sword D+10", "poison sword D+10"],
@@ -73,6 +73,10 @@ var for_melee_single_target = [
   "sword", "hammer",
 ]
 
+/* Weapons to use for melee AoE, same priority
+logic as the regular melee. */
+var for_melee_aoe = ["arm"]
+
 /* If true, then script can use dX weapons for 
 dps purposes if you don't have a D weapon of 
 that element. */
@@ -81,10 +85,6 @@ var use_mods_for_dmg = false
 /* How many regular enemies are needed to start
 using AoE weapons instead of single target. */
 var aoe_threshold = 4
-
-/* Weapons to use for melee AoE, same priority
-logic as the regular melee. */
-var for_melee_aoe = ["arm"]
 
 /* If this is set to `true`, script will prefer
 to use ranged items from lists below instead of
@@ -164,13 +164,13 @@ var useable_abilities = ["dash", "bash",
 /* Advanced: these are default values, change 
 them accordingly if you have speed enchants on 
 these weapons. */
-var hammer_frames = 15
-var bardiche_frames = 30
+var hammer_frames = 14
+var bardiche_frames = 22
 
 /* `dmg * (crit_mult + base_crit_mult)`,
 script won't use the bardiche ability if 
 non-boss's HP is lower than twice this damage*/
-var bardiche_dmg = 52 * (7.6 + 2)
+var bardiche_dmg = 52 * (11.2 + 2)
 
 /* Use scripted potions for bosses. */
 var use_potions_for_bosses = true
@@ -182,7 +182,7 @@ default logic that prefers to drink during the
 mushrooms, pallas, bronze, naga. The rest 
 already drink the potion in phase1. */
 var fast_potion_bosses = [
-  "mushrooms", "pallas", "bronze", "naga"
+  "mushrooms", "pallas",
 ]
 
 /* Fraction of HP to consider low. When on low 
@@ -204,14 +204,14 @@ var max_chill_stacks = 6
 `useable_abilities`). Will use at max_stacks,
 or if boss's HP is lower than stacks * dmg. */
 var max_ignition_stacks = 10
-var cinderwisp_dmg = 24
+var cinderwisp_dmg = 28
 
 /* At least this many enemies must be present
 to use Smite ability. */
 var smite_threshold = 7
 
 // Depends on level/enchants of your BFG.
-var smite_damage = 90
+var smite_damage = 95
 
 // Enable smiting two screens at once
 var long_long_smite = true
@@ -248,6 +248,13 @@ var ui_show_statuses = true
 var ui_show_debug = true
 var enable_tracing = false
 var enable_hit_tracking = false
+
+/* If true, script will exit the location if
+your current time > average time. */
+var speedrun = true
+
+// If true, will use hatchet and shovel
+var harvesting = true
 
 /*********************
 **     #Progress    **
@@ -359,6 +366,9 @@ func healwalk()
     ^item.potion = "vampiric")
       activate potion
     return false // start combat instead
+  :?harvesting & harvest.distance < 3 &
+  ^_harvest()
+    return true
   :?should_summon()
     return equip_L("trisk") & summon()
   :?can_qs_dash()
@@ -367,6 +377,16 @@ func healwalk()
   ?hp < maxhp
     return equip_L("ouroboros")
   return equip_L("trisk")
+
+func _harvest()
+  ?loc = Rocky
+    return equip_L("shovel")
+  :?loc = Deadwood
+    equip_R("hatchet")
+    ?harvest.distance < 2
+      use("hatchet")
+    return true
+  return false
 
 func avoid_explosion()
   trace("explode")
@@ -1787,6 +1807,8 @@ func _update_game_state()
 
 func prelude()
   // reset/update dynamic global vars
+  ?speedrun & (totaltime > loc.averageTime)
+    loc.Leave()
   _update_game_state()
   _update_my_effects()
   _update_abilities()
