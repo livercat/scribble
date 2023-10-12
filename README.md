@@ -11,8 +11,8 @@ Warning: this README and the script itself contain a lot of spoilers and hidden 
 
 1. Efficient combat: chooses weapons based on enemy element and location, uses item abilities when appropriate, and intelligently handles boss mechanics.
 1. Optional UI: shows your buffs/debuffs, ability cooldowns, and extended enemy info (disabled by default). All of these can be individually hidden.
-1. Blazing fast: caches computations where possible, and uses efficient branching
-to not slow your game down.
+1. Pretty fast: caches computations where possible, and uses efficient branching
+to not slow your game down. Some older devices can be laggy, unfortunately.
 1. Aimed at players with moderate gear: 8-10* with +5 to +10 enchants, nothing fancy.
 1. Supports advanced mechanics which are broadly applicable regardless of your gear level: double-screen smite, `ai.idle` AAC for 2-handed melee weapons,
 debuffing bosses, helping with quests, and much more.
@@ -56,6 +56,11 @@ What script considers when selecting a weapon:
 - Uses `A` shields when approaching the enemy to get the armor.
 - Dashes with shields and quarterstaff as much as possible.
 - Unmakes high-HP enemies.
+
+### Using two items of the same level?
+
+When you want to use two items of the same level, you need differentiate them somehow: with a golden skin, name tag, or sparkle.
+Then place the marked weapon first in the list, and include the customisation before the letter & enchantment level. For example, to use named fire sword `heartburn D+18` alongside a regular `D+18`, you can use `sword` -> `fire` -> `["heartburn D+18", "D+18"]`
 
 ### Bosses
 
