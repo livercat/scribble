@@ -1,3 +1,6 @@
+Version 1.3.2b
+  - Fixed `debug` version of the script to work with SSRPG v3.49.6 and later
+
 Version 1.3.2
   - New setting: `speedrun` - exit the location if totaltime > averageTime (thx @guv_bubbs)
   - New setting: `harvesting` - equip and use shovel and hatchet where possible (thx @guv_bubbs)

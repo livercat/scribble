@@ -1884,11 +1884,11 @@ func draw_ui()
       >`@x@,@y+5@,@gray@,Count: @foe.count@
     y = 24
     // %start_dev%
-    var frame_time = 0
+    var frame_time = math.BigNumber(0)
     for ft:frame_times
-      frame_time = frame_time + ft
-    var info = "ms: " + frame_time / 
-    ^frame_times.Count()
+      frame_time = frame_time.Add(ft)
+    var info = "ms: " + frame_time.Div(
+    ^frame_times.Count()).ToString()
     ?lock
       info = info + ", L: " + lock + 
       ^" (" + lock_timer + ")"
@@ -1983,7 +1983,7 @@ func reset_loop()
 var start_t = 0
 var frame_times = []
 var index = 0
-start_t = time.ms
+start_t = time.msbn
 // %end_dev%
 ?loc.begin
   equip_L("quest")
@@ -2010,9 +2010,9 @@ draw_ui()
 ?enable_hit_tracking
   track_hits()
 ?frame_times.Count() < 30
-  frame_times.Add(time.ms-start_t)
+  frame_times.Add((time.msbn).Sub(start_t))
 :
-  frame_times.Emplace(index, time.ms-start_t)
+  frame_times.Emplace(index, (time.msbn).Sub(start_t))
   index++
   ?index = frame_times.Count()
     index = 0
